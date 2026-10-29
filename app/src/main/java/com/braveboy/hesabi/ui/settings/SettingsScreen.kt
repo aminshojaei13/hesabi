@@ -1,0 +1,372 @@
+package com.braveboy.hesabi.ui.settings
+
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.braveboy.hesabi.core.money.Currency
+import com.braveboy.hesabi.di.AppContainer
+import com.braveboy.hesabi.domain.model.AppSettings
+import com.braveboy.hesabi.domain.model.ThemeMode
+import com.braveboy.hesabi.ui.components.ConfirmDialog
+import com.braveboy.hesabi.ui.components.HesabiButton
+import com.braveboy.hesabi.ui.components.HesabiButtonVariant
+import com.braveboy.hesabi.ui.components.HesabiCard
+import com.braveboy.hesabi.ui.components.HesabiTopBar
+import com.braveboy.hesabi.ui.components.InfoBanner
+import com.braveboy.hesabi.ui.components.SectionHeader
+import com.braveboy.hesabi.ui.components.SettingsRow
+import com.braveboy.hesabi.ui.hesabiViewModel
+import com.braveboy.hesabi.ui.preview.PreviewData
+import com.braveboy.hesabi.ui.theme.HesabiSpacing
+import com.braveboy.hesabi.ui.theme.HesabiTheme
+
+@Composable
+fun SettingsScreen(
+    container: AppContainer,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val viewModel: SettingsViewModel = hesabiViewModel(container)
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var showClearConfirm by remember { mutableStateOf(false) }
+    var showAccountPicker by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            viewModel.setSmsCapture(true)
+        } else {
+            viewModel.showMessage("اجازهٔ پیامک داده نشد. ثبت خودکار خاموش می‌ماند.")
+        }
+    }
+
+    SettingsContent(
+        state = state,
+        onBack = onBack,
+        onThemeMode = viewModel::setThemeMode,
+        onDynamicColor = viewModel::setDynamicColor,
+        onCurrency = viewModel::setCurrency,
+        onHideAmounts = viewModel::setHideAmounts,
+        onSmsCapture = { enabled ->
+            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED
+            if (enabled && !granted) {
+                permissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+            } else {
+                viewModel.setSmsCapture(enabled)
+            }
+        },
+        onAmountsAreRial = viewModel::setAmountsAreRial,
+        onPickAccount = { showAccountPicker = true },
+        onClearData = { showClearConfirm = true },
+        onDismissMessage = viewModel::dismissMessage,
+        modifier = modifier,
+    )
+
+    if (showAccountPicker) {
+        AlertDialog(
+            onDismissRequest = { showAccountPicker = false },
+            title = { Text("حساب پیش‌فرض") },
+            text = {
+                Column {
+                    SettingsRow(
+                        title = "هیچ‌کدام",
+                        trailing = {
+                            RadioButton(
+                                selected = state.settings.defaultAccountId == null,
+                                onClick = {
+                                    viewModel.setDefaultAccount(null)
+                                    showAccountPicker = false
+                                },
+                            )
+                        },
+                        onClick = {
+                            viewModel.setDefaultAccount(null)
+                            showAccountPicker = false
+                        },
+                    )
+                    state.accounts.forEach { account ->
+                        SettingsRow(
+                            title = account.name,
+                            subtitle = account.kind.label,
+                            trailing = {
+                                RadioButton(
+                                    selected = state.settings.defaultAccountId == account.id,
+                                    onClick = {
+                                        viewModel.setDefaultAccount(account.id)
+                                        showAccountPicker = false
+                                    },
+                                )
+                            },
+                            onClick = {
+                                viewModel.setDefaultAccount(account.id)
+                                showAccountPicker = false
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAccountPicker = false }) { Text("بستن") }
+            },
+        )
+    }
+
+    if (showClearConfirm) {
+        ConfirmDialog(
+            title = "پاک کردن همهٔ داده‌ها",
+            message = "همهٔ تراکنش‌ها، حساب‌ها، دسته‌ها، بودجه‌ها و پیامک‌ها حذف می‌شوند و برنامه از ابتدا شروع می‌کند. " +
+                "اگر پشتیبان نداری، این کار برگشت‌پذیر نیست.",
+            confirmLabel = "همه را پاک کن",
+            dangerous = true,
+            onConfirm = {
+                showClearConfirm = false
+                viewModel.clearAllData()
+            },
+            onDismiss = { showClearConfirm = false },
+        )
+    }
+}
+
+@Composable
+fun SettingsContent(
+    state: SettingsUiState,
+    onBack: () -> Unit,
+    onThemeMode: (ThemeMode) -> Unit,
+    onDynamicColor: (Boolean) -> Unit,
+    onCurrency: (Currency) -> Unit,
+    onHideAmounts: (Boolean) -> Unit,
+    onSmsCapture: (Boolean) -> Unit,
+    onAmountsAreRial: (Boolean) -> Unit,
+    onPickAccount: () -> Unit,
+    onClearData: () -> Unit,
+    onDismissMessage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val settings = state.settings
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = HesabiSpacing.lg)
+            .padding(bottom = HesabiSpacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(HesabiSpacing.lg),
+    ) {
+        HesabiTopBar(title = "تنظیمات", subtitle = "ظاهر و رفتار برنامه", onBack = onBack)
+        if (state.message != null) {
+            InfoBanner(
+                text = state.message,
+                actionLabel = "باشه",
+                onAction = onDismissMessage,
+            )
+        }
+        HesabiCard {
+            SectionHeader("ظاهر")
+            Text("حالت رنگ", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
+                ThemeMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = settings.themeMode == mode,
+                        onClick = { onThemeMode(mode) },
+                        label = { Text(mode.label) },
+                    )
+                }
+            }
+            SwitchRow(
+                title = "رنگ‌های سیستم",
+                subtitle = "پالت اندروید ۱۲ به بالا (Dynamic Color)",
+                checked = settings.dynamicColor,
+                onCheckedChange = onDynamicColor,
+            )
+            SwitchRow(
+                title = "پنهان‌کردن مبالغ",
+                subtitle = "برای وقتی در جمع هستی",
+                checked = settings.hideAmounts,
+                onCheckedChange = onHideAmounts,
+            )
+            InfoBanner(
+                text = "رنگ سبز/قرمز درآمد و هزینه همیشه ثابت می‌ماند تا با پالت سیستم گم نشود.",
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HesabiCard {
+            SectionHeader("پول")
+            Text("واحد نمایش", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
+                Currency.entries.forEach { currency ->
+                    FilterChip(
+                        selected = settings.currency == currency,
+                        onClick = { onCurrency(currency) },
+                        label = { Text(currency.labelFa) },
+                    )
+                }
+            }
+            Text(
+                text = "مبالغ همیشه به تومان ذخیره می‌شوند؛ ریال فقط برای نمایش و خواندن پیامک بانکی است.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SwitchRow(
+                title = "پیامک‌های بانکی به ریال هستند",
+                subtitle = "معمولاً بانک‌ها ریال می‌نویسند",
+                checked = settings.amountsAreRial,
+                onCheckedChange = onAmountsAreRial,
+            )
+        }
+        HesabiCard {
+            SectionHeader("پیش‌فرض‌ها")
+            SettingsRow(
+                title = "حساب پیش‌فرض",
+                subtitle = state.accounts.firstOrNull { it.id == settings.defaultAccountId }?.name ?: "انتخاب نشده",
+                icon = Icons.Rounded.AccountBalanceWallet,
+                onClick = onPickAccount,
+            )
+        }
+        HesabiCard {
+            SectionHeader("پیامک بانکی")
+            SwitchRow(
+                title = "دریافت خودکار پیامک",
+                subtitle = "اختیاری؛ فقط با اجازهٔ تو فعال می‌شود",
+                checked = settings.smsCaptureEnabled,
+                onCheckedChange = onSmsCapture,
+            )
+            InfoBanner(
+                text = "حسابی دفتر پیامک را نمی‌خواند. فقط پیامک‌های تازهٔ بانکی را بعد از اجازهٔ سیستمی می‌بیند و همه‌چیز محلی می‌ماند.",
+                icon = Icons.Rounded.Sms,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HesabiCard {
+            SectionHeader("داده‌ها")
+            SettingsRow(
+                title = "پاک کردن همهٔ داده‌ها",
+                subtitle = "بازگشت به حالت اولیه",
+                icon = Icons.Rounded.DeleteForever,
+                onClick = onClearData,
+            )
+            HesabiButton(
+                text = "پاک کردن همهٔ داده‌ها",
+                onClick = onClearData,
+                variant = HesabiButtonVariant.DANGER,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        InfoBanner(
+            text = "حسابی حساب کاربری ندارد، تبلیغ ندارد و هیچ داده‌ای را به سرور نمی‌فرستد.",
+            icon = Icons.Rounded.Payments,
+        )
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = checked, onClick = { onCheckedChange(!checked) })
+            .padding(vertical = HesabiSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Preview(name = "تنظیمات", heightDp = 1100, showBackground = true)
+@Composable
+private fun SettingsPreview() {
+    val state = SettingsUiState(
+        settings = AppSettings(
+            themeMode = ThemeMode.SYSTEM,
+            dynamicColor = true,
+            currency = Currency.TOMAN,
+            hideAmounts = false,
+            smsCaptureEnabled = true,
+            amountsAreRial = true,
+            defaultAccountId = "acc_card",
+        ),
+        accounts = PreviewData.accounts,
+    )
+    HesabiTheme {
+        androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            }
+        }
+    }
+}
+
+@Preview(
+    name = "تنظیمات - تیره",
+    heightDp = 1100,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+)
+@Composable
+private fun SettingsDarkPreview() {
+    HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.DARK) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                SettingsContent(
+                    SettingsUiState(accounts = PreviewData.accounts),
+                    {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                )
+            }
+        }
+    }
+}
