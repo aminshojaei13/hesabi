@@ -136,13 +136,9 @@ fun BudgetContent(
                 period = state.period,
                 onPrevious = onPreviousMonth,
                 onNext = onNextMonth,
+                onGoToCurrentMonth = onCurrentMonth,
                 currentPeriod = MonthPeriod.current(),
             )
-            if (state.period != MonthPeriod.current()) {
-                TextButton(onClick = onCurrentMonth, modifier = Modifier.fillMaxWidth()) {
-                    Text("برگشت به ماه جاری", style = MaterialTheme.typography.labelSmall)
-                }
-            }
         }
         item {
             BudgetProgressCard(

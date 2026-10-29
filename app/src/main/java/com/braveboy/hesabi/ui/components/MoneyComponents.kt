@@ -1,10 +1,10 @@
 package com.braveboy.hesabi.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -131,6 +131,7 @@ fun MonthSwitcher(
     period: MonthPeriod,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onGoToCurrentMonth: () -> Unit,
     modifier: Modifier = Modifier,
     currentPeriod: MonthPeriod = MonthPeriod.current(),
 ) {
@@ -146,6 +147,7 @@ fun MonthSwitcher(
             Text(text = period.label, style = MaterialTheme.typography.titleMedium)
             if (period != currentPeriod) {
                 Text(
+                    modifier = Modifier.clickable(onClick = onGoToCurrentMonth),
                     text = "برگشت به ماه جاری",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
@@ -171,7 +173,10 @@ fun BalanceHero(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.primary,
     ) {
-        Column(modifier = Modifier.padding(HesabiSpacing.xl), verticalArrangement = Arrangement.spacedBy(HesabiSpacing.md)) {
+        Column(
+            modifier = Modifier.padding(HesabiSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(HesabiSpacing.md)
+        ) {
             Text(
                 text = "موجودی کل",
                 style = MaterialTheme.typography.labelMedium,
@@ -221,12 +226,27 @@ private fun AmountPreview() {
             AmountText(185_000, type = TransactionType.EXPENSE, showSign = true)
             AmountText(24_000_000, type = TransactionType.INCOME, showSign = true)
         }
-        BalanceHero(balanceToman = 15_250_000, monthExpenseToman = 3_200_000, monthIncomeToman = 24_000_000)
+        BalanceHero(
+            balanceToman = 15_250_000,
+            monthExpenseToman = 3_200_000,
+            monthIncomeToman = 24_000_000
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
             StatTile("امروز", "۱۲۵٬۰۰۰", modifier = Modifier.weight(1f), caption = "۳ تراکنش")
-            StatTile("مانده ماه", "۲۰٬۸۰۰٬۰۰۰", modifier = Modifier.weight(1f), caption = "مثبت", valueColor = LocalHesabiSemantic.current.income)
+            StatTile(
+                "مانده ماه",
+                "۲۰٬۸۰۰٬۰۰۰",
+                modifier = Modifier.weight(1f),
+                caption = "مثبت",
+                valueColor = LocalHesabiSemantic.current.income
+            )
         }
-        MonthSwitcher(period = MonthPeriod(1405, 8), onPrevious = {}, onNext = {})
+        MonthSwitcher(
+            period = MonthPeriod(1405, 8),
+            onPrevious = {},
+            onNext = {},
+            onGoToCurrentMonth = {}
+        )
     }
 }
 

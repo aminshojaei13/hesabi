@@ -14,9 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.Icon
@@ -136,6 +135,7 @@ fun HomeContent(
                 period = state.period,
                 onPrevious = onPreviousMonth,
                 onNext = onNextMonth,
+                onGoToCurrentMonth = onGoToCurrentMonth,
                 currentPeriod = MonthPeriod.current(),
             )
         }
@@ -206,8 +206,10 @@ fun HomeContent(
             items(count = state.recent.size, key = { state.recent[it].id }) { index ->
                 val transaction = state.recent[index]
                 val category = state.categories[transaction.categoryId]
-                val account = state.balances.firstOrNull { it.account.id == transaction.accountId }?.account
-                val toAccount = state.balances.firstOrNull { it.account.id == transaction.toAccountId }?.account
+                val account =
+                    state.balances.firstOrNull { it.account.id == transaction.accountId }?.account
+                val toAccount =
+                    state.balances.firstOrNull { it.account.id == transaction.toAccountId }?.account
                 TransactionRow(
                     transaction = transaction,
                     categoryName = category?.name ?: "بدون دسته",
@@ -251,11 +253,21 @@ private fun QuickAction(
         ) {
             Surface(shape = CircleShape, color = color, modifier = Modifier.size(30.dp)) {
                 androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
             Spacer(Modifier.height(HesabiSpacing.xs))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.Medium)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = color,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -323,7 +335,8 @@ private fun HomeEmptyPreview() {
                     state = HomeUiState(
                         period = MonthPeriod.current(),
                         recent = emptyList(),
-                        categories = PreviewData.categories.filter { it.kind == CategoryKind.EXPENSE }.associateBy { it.id },
+                        categories = PreviewData.categories.filter { it.kind == CategoryKind.EXPENSE }
+                            .associateBy { it.id },
                         balances = PreviewData.balances,
                         pendingSmsCount = 0,
                         loading = false,

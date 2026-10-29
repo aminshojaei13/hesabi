@@ -99,16 +99,9 @@ fun ReportsContent(
                 period = state.period,
                 onPrevious = onPreviousMonth,
                 onNext = onNextMonth,
+                onGoToCurrentMonth = onCurrentMonth,
                 currentPeriod = MonthPeriod.current(),
             )
-            if (state.period != MonthPeriod.current()) {
-                androidx.compose.material3.TextButton(
-                    onClick = onCurrentMonth,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("برگشت به ماه جاری", style = MaterialTheme.typography.labelSmall)
-                }
-            }
         }
         if (state.loading) {
             item { LoadingSkeleton(rows = 5) }
