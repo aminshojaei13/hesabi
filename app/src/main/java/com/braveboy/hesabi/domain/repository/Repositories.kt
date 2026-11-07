@@ -124,6 +124,9 @@ interface SettingsRepository {
     suspend fun setPinCodeHash(hash: String)
     suspend fun setBiometricEnabled(enabled: Boolean)
     suspend fun setRemindersEnabled(enabled: Boolean)
+    suspend fun setMonthlySalary(amountToman: Long)
+    suspend fun setSalaryAccountId(id: String?)
+    suspend fun setAutoDepositSalary(enabled: Boolean)
 }
 
 interface PersonRepository {

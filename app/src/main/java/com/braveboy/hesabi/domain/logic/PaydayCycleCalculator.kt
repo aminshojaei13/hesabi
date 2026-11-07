@@ -34,6 +34,15 @@ data class DailySafeToSpend(
     val dailyBudgetCapToman: Long,
 )
 
+data class LiquidityForecast(
+    val monthlySalaryToman: Long,
+    val fixedCommitmentsToman: Long,
+    val netDisposableToman: Long,
+    val daysRemaining: Int,
+    val dailyRunwayToman: Long,
+    val runwayStatus: BurnRateStatus,
+)
+
 object PaydayCycleCalculator {
 
     /**
@@ -155,6 +164,33 @@ object PaydayCycleCalculator {
             nextPaydayDate = cycle.nextPaydayDate,
             burnRateStatus = burnRateStatus,
             dailyBudgetCapToman = safeToSpendToday,
+        )
+    }
+
+    /**
+     * Calculates monthly liquidity forecast based on registered base salary,
+     * fixed recurring obligations/installments, and expenses so far this cycle.
+     */
+    fun calculateLiquidityForecast(
+        monthlySalaryToman: Long,
+        fixedCommitmentsToman: Long,
+        currentCycleExpenseToman: Long,
+        cycle: PaydayCycle,
+    ): LiquidityForecast {
+        val netDisposable = (monthlySalaryToman - fixedCommitmentsToman - currentCycleExpenseToman).coerceAtLeast(0L)
+        val dailyRunway = if (cycle.daysRemaining > 0) (netDisposable / cycle.daysRemaining).coerceAtLeast(0L) else netDisposable
+        val status = when {
+            netDisposable <= 0L -> BurnRateStatus.DANGER
+            dailyRunway < (monthlySalaryToman / 60) -> BurnRateStatus.CAUTION
+            else -> BurnRateStatus.NORMAL
+        }
+        return LiquidityForecast(
+            monthlySalaryToman = monthlySalaryToman,
+            fixedCommitmentsToman = fixedCommitmentsToman,
+            netDisposableToman = netDisposable,
+            daysRemaining = cycle.daysRemaining,
+            dailyRunwayToman = dailyRunway,
+            runwayStatus = status,
         )
     }
 }

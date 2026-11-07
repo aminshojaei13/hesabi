@@ -40,6 +40,9 @@ class SettingsRepositoryImpl(
         val pinCodeHash = stringPreferencesKey("pin_code_hash")
         val biometricEnabled = booleanPreferencesKey("biometric_enabled")
         val remindersEnabled = booleanPreferencesKey("reminders_enabled")
+        val monthlySalary = longPreferencesKey("monthly_salary")
+        val salaryAccountId = stringPreferencesKey("salary_account_id")
+        val autoDepositSalary = booleanPreferencesKey("auto_deposit_salary")
     }
 
     override val settings: Flow<AppSettings> = context.hesabiSettings.data
@@ -60,6 +63,9 @@ class SettingsRepositoryImpl(
                 pinCodeHash = prefs[Keys.pinCodeHash] ?: "",
                 biometricEnabled = prefs[Keys.biometricEnabled] ?: false,
                 remindersEnabled = prefs[Keys.remindersEnabled] ?: true,
+                monthlySalaryToman = prefs[Keys.monthlySalary] ?: 0L,
+                salaryAccountId = prefs[Keys.salaryAccountId],
+                autoDepositSalary = prefs[Keys.autoDepositSalary] ?: false,
             )
         }
 
@@ -103,6 +109,18 @@ class SettingsRepositoryImpl(
 
     override suspend fun setRemindersEnabled(enabled: Boolean) = edit {
         it[Keys.remindersEnabled] = enabled
+    }
+
+    override suspend fun setMonthlySalary(amountToman: Long) = edit {
+        it[Keys.monthlySalary] = amountToman.coerceAtLeast(0L)
+    }
+
+    override suspend fun setSalaryAccountId(id: String?) = edit {
+        if (id == null) it.remove(Keys.salaryAccountId) else it[Keys.salaryAccountId] = id
+    }
+
+    override suspend fun setAutoDepositSalary(enabled: Boolean) = edit {
+        it[Keys.autoDepositSalary] = enabled
     }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {

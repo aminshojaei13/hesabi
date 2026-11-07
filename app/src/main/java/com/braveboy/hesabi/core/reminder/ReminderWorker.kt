@@ -27,9 +27,10 @@ class ReminderWorker(
 
         val today = JalaliDate.today().toEpochDay()
 
-        // Automatically process due recurring transactions if autoApply is enabled
+        // Automatically process due recurring transactions and salary auto-deposit if enabled
         runCatching {
             container.recurringTransactionProcessor.processDueTransactions(today)
+            container.processSalaryAutoDeposit(today)
         }
 
         val settings = container.settingsRepository.current()

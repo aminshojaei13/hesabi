@@ -23,6 +23,9 @@ data class AppSettings(
     val pinCodeHash: String = "",
     val biometricEnabled: Boolean = false,
     val remindersEnabled: Boolean = true,
+    val monthlySalaryToman: Long = 0L,
+    val salaryAccountId: String? = null,
+    val autoDepositSalary: Boolean = false,
 )
 
 data class AccountWithBalance(

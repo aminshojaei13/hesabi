@@ -39,6 +39,11 @@ data class HomeUiState(
     val savingsGoals: List<SavingsGoal> = emptyList(),
     val safeToSpend: DailySafeToSpend? = null,
     val paydayCycle: PaydayCycle? = null,
+    val paydayDayOfMonth: Int = 1,
+    val monthlySalaryToman: Long = 0L,
+    val salaryAccountId: String? = null,
+    val autoDepositSalary: Boolean = false,
+    val liquidityForecast: com.braveboy.hesabi.domain.logic.LiquidityForecast? = null,
     val pendingSmsCount: Int = 0,
     val loading: Boolean = true,
 ) {
@@ -53,7 +58,7 @@ class HomeViewModel(
     budgetRepository: BudgetRepository,
     smsRepository: SmsRepository,
     private val savingsGoalRepository: SavingsGoalRepository,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val period = MutableStateFlow(MonthPeriod.current())
@@ -65,6 +70,9 @@ class HomeViewModel(
         val budgets: List<com.braveboy.hesabi.domain.model.Budget>,
         val goals: List<SavingsGoal>,
         val paydayDay: Int,
+        val monthlySalaryToman: Long = 0L,
+        val salaryAccountId: String? = null,
+        val autoDepositSalary: Boolean = false,
     )
 
     private val core = combine(
@@ -75,11 +83,16 @@ class HomeViewModel(
             period.flatMapLatest { budgetRepository.observeForPeriod(it.key) },
             savingsGoalRepository.observeActive(),
         ) { transactions, categories, balances, budgets, goals ->
-            Core(transactions, categories, balances, budgets, goals, paydayDay = 1)
+            Core(transactions, categories, balances, budgets, goals, paydayDay = 1, monthlySalaryToman = 0L)
         },
         settingsRepository.settings,
     ) { coreData, settings ->
-        coreData.copy(paydayDay = settings.paydayDayOfMonth)
+        coreData.copy(
+            paydayDay = settings.paydayDayOfMonth,
+            monthlySalaryToman = settings.monthlySalaryToman,
+            salaryAccountId = settings.salaryAccountId,
+            autoDepositSalary = settings.autoDepositSalary,
+        )
     }
 
     val state: StateFlow<HomeUiState> = combine(
@@ -120,6 +133,15 @@ class HomeViewModel(
             savingsGoalsAllocatedToman = goalsAllocated,
         )
 
+        val liquidityForecast = if (data.monthlySalaryToman > 0) {
+            PaydayCycleCalculator.calculateLiquidityForecast(
+                monthlySalaryToman = data.monthlySalaryToman,
+                fixedCommitmentsToman = goalsAllocated,
+                currentCycleExpenseToman = cycleExpenses,
+                cycle = cycle,
+            )
+        } else null
+
         HomeUiState(
             period = current,
             report = report,
@@ -131,6 +153,11 @@ class HomeViewModel(
             savingsGoals = data.goals,
             safeToSpend = safeToSpend,
             paydayCycle = cycle,
+            paydayDayOfMonth = data.paydayDay,
+            monthlySalaryToman = data.monthlySalaryToman,
+            salaryAccountId = data.salaryAccountId,
+            autoDepositSalary = data.autoDepositSalary,
+            liquidityForecast = liquidityForecast,
             pendingSmsCount = pendingSms,
             loading = false,
         )
@@ -146,6 +173,20 @@ class HomeViewModel(
 
     fun goToCurrentMonth() {
         period.value = MonthPeriod.current()
+    }
+
+    fun updateSalarySettings(
+        salaryToman: Long,
+        payday: Int,
+        accountId: String?,
+        autoDeposit: Boolean,
+    ) {
+        viewModelScope.launch {
+            settingsRepository.setMonthlySalary(salaryToman)
+            settingsRepository.setPaydayDayOfMonth(payday)
+            settingsRepository.setSalaryAccountId(accountId)
+            settingsRepository.setAutoDepositSalary(autoDeposit)
+        }
     }
 
     fun saveGoal(goal: SavingsGoal) {

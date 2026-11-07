@@ -77,6 +77,13 @@ class AppContainer(context: Context) {
         categoryDao = database.categoryDao(),
         transactionDao = database.transactionDao(),
         budgetDao = database.budgetDao(),
+        savingsGoalDao = database.savingsGoalDao(),
+        personDao = database.personDao(),
+        debtDao = database.debtDao(),
+        chequeDao = database.chequeDao(),
+        loanDao = database.loanDao(),
+        installmentDao = database.installmentDao(),
+        recurringTransactionDao = database.recurringTransactionDao(),
         settingsRepository = settingsRepository,
         appVersion = BuildConfig.VERSION_NAME,
     )
@@ -94,6 +101,47 @@ class AppContainer(context: Context) {
             val first = database.accountDao().getAll().firstOrNull()
             if (first != null) settingsRepository.setDefaultAccountId(first.id)
         }
+    }
+
+    /**
+     * Checks if today is payday and user has configured auto-deposit for monthly salary.
+     * If so and salary hasn't been deposited today yet, inserts an income transaction.
+     */
+    suspend fun processSalaryAutoDeposit(
+        todayEpochDay: Long = com.braveboy.hesabi.core.date.JalaliDate.today().toEpochDay(),
+    ) = withContext(Dispatchers.IO) {
+        val settings = settingsRepository.current()
+        if (!settings.autoDepositSalary || settings.monthlySalaryToman <= 0) return@withContext
+
+        val todayJalali = com.braveboy.hesabi.core.date.JalaliDate.fromEpochDay(todayEpochDay)
+        val paydayDay = settings.paydayDayOfMonth.coerceIn(1, 31)
+        if (todayJalali.day != paydayDay) return@withContext
+
+        val existingToday = database.transactionDao().getAll().filter { it.occurredOnEpochDay == todayEpochDay }
+        val salaryAlreadyDeposited = existingToday.any { it.note.contains("حقوق ماهانه") }
+        if (salaryAlreadyDeposited) return@withContext
+
+        val targetAccountId = settings.salaryAccountId
+            ?: settings.defaultAccountId
+            ?: database.accountDao().getAll().firstOrNull()?.id
+            ?: return@withContext
+
+        val categories = database.categoryDao().getAll()
+        val salaryCategory = categories.firstOrNull { it.kind == "INCOME" && (it.name.contains("حقوق") || it.name.contains("درآمد")) }
+            ?: categories.firstOrNull { it.kind == "INCOME" }
+
+        val transaction = com.braveboy.hesabi.domain.model.Transaction(
+            id = java.util.UUID.randomUUID().toString(),
+            type = com.braveboy.hesabi.domain.model.TransactionType.INCOME,
+            amountToman = settings.monthlySalaryToman,
+            accountId = targetAccountId,
+            categoryId = salaryCategory?.id,
+            occurredOnEpochDay = todayEpochDay,
+            note = "حقوق ماهانه (ثبت خودکار)",
+            source = com.braveboy.hesabi.domain.model.TransactionSource.MANUAL,
+            createdAtMillis = System.currentTimeMillis(),
+        )
+        transactionRepository.save(transaction)
     }
 
     /** Removes every user row, then restores the minimal defaults. Settings are reset too. */

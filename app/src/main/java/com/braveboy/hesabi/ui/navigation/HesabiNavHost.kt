@@ -1,14 +1,19 @@
 package com.braveboy.hesabi.ui.navigation
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
@@ -152,6 +157,23 @@ private fun MainScaffold(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            if (showBottomBar) {
+                androidx.compose.material3.FloatingActionButton(
+                    onClick = { showVoiceSheet = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Mic,
+                        contentDescription = "ثبت صوتی",
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = androidx.compose.material3.FabPosition.Start,
         bottomBar = {
             if (showBottomBar) {
                 HesabiFloatingNavigationBar(
@@ -159,7 +181,6 @@ private fun MainScaffold(
                     pendingSmsCount = pendingSms,
                     onTabSelected = { route -> navigateTab(navController, route) },
                     onAddClick = { navController.navigate(Routes.newEntry(TransactionType.EXPENSE)) },
-                    onVoiceClick = { showVoiceSheet = true },
                 )
             }
         },
@@ -289,16 +310,15 @@ private fun HesabiFloatingNavigationBar(
     pendingSmsCount: Int,
     onTabSelected: (String) -> Unit,
     onAddClick: () -> Unit,
-    onVoiceClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .shadow(12.dp, RoundedCornerShape(32.dp)),
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surface,
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .shadow(10.dp, RoundedCornerShape(28.dp)),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
         tonalElevation = 6.dp,
         border = BorderStroke(
             1.dp,
@@ -308,8 +328,8 @@ private fun HesabiFloatingNavigationBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Home Tab
@@ -328,42 +348,21 @@ private fun HesabiFloatingNavigationBar(
                 onClick = { onTabSelected(Routes.TRANSACTIONS) },
             )
 
-            // Center Floating Mic & Add Actions
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            // Center Floating Add Action
+            Surface(
+                onClick = onAddClick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 6.dp,
+                modifier = Modifier.size(46.dp),
             ) {
-                Surface(
-                    onClick = onVoiceClick,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondary,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.size(42.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Mic,
-                            contentDescription = "ثبت صوتی",
-                            tint = MaterialTheme.colorScheme.onSecondary,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
-                Surface(
-                    onClick = onAddClick,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.size(46.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Add,
-                            contentDescription = "ثبت دستی",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = "ثبت دستی",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
+                    )
                 }
             }
 
@@ -398,14 +397,14 @@ private fun HesabiNavItem(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Transparent,
         modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
             if (badgeCount > 0 && !selected) {
                 BadgedBox(badge = { Badge { Text(badgeCount.toString()) } }) {
@@ -413,7 +412,7 @@ private fun HesabiNavItem(
                         icon,
                         contentDescription = label,
                         tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             } else {
@@ -421,15 +420,22 @@ private fun HesabiNavItem(
                     icon,
                     contentDescription = label,
                     tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
+            Spacer(Modifier.height(3.dp))
             if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            } else {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

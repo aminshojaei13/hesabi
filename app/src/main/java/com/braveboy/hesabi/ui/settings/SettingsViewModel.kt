@@ -67,6 +67,12 @@ class SettingsViewModel(
 
     fun setRemindersEnabled(enabled: Boolean) = launchSetting { settingsRepository.setRemindersEnabled(enabled) }
 
+    fun setMonthlySalary(amountToman: Long) = launchSetting { settingsRepository.setMonthlySalary(amountToman) }
+
+    fun setSalaryAccountId(id: String?) = launchSetting { settingsRepository.setSalaryAccountId(id) }
+
+    fun setAutoDepositSalary(enabled: Boolean) = launchSetting { settingsRepository.setAutoDepositSalary(enabled) }
+
     fun completeOnboarding() {
         viewModelScope.launch { settingsRepository.setOnboarded(true) }
     }

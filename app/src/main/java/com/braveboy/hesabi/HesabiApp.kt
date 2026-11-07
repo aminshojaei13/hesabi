@@ -18,9 +18,9 @@ class HesabiApp : Application() {
         container = AppContainer(this)
         applicationScope.launch {
             container.ensureSeeded()
-            container.recurringTransactionProcessor.processDueTransactions(
-                JalaliDate.today().toEpochDay()
-            )
+            val todayEpochDay = JalaliDate.today().toEpochDay()
+            container.recurringTransactionProcessor.processDueTransactions(todayEpochDay)
+            container.processSalaryAutoDeposit(todayEpochDay)
         }
         ReminderScheduler.schedule(this)
     }

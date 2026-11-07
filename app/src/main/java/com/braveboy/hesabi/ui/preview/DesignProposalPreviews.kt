@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Home
@@ -307,7 +308,7 @@ fun BottomNavOptionA(modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(6.dp)
             ) {
                 Icon(
-                    Icons.Rounded.ReceiptLong,
+                    Icons.AutoMirrored.Rounded.ReceiptLong,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),

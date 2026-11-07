@@ -1,0 +1,122 @@
+<svg width="393" height="852" viewBox="0 0 393 852" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="393" y2="852" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B0E17"/>
+      <stop offset="100%" stop-color="#0F1422"/>
+    </linearGradient>
+
+    <linearGradient id="neonCyanEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+
+    <linearGradient id="neonPurplePink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+
+    <linearGradient id="glassCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A2234" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#121826" stop-opacity="0.65"/>
+    </linearGradient>
+
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="393" height="852" fill="url(#bgGrad)"/>
+
+  <!-- Top App Bar -->
+  <g id="TopBar" transform="translate(20, 50)">
+    <circle cx="20" cy="20" r="18" fill="#1E293B"/>
+    <text x="20" y="24" fill="#94A3B8" font-size="14" text-anchor="middle">←</text>
+    <text x="353" y="18" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="12" text-anchor="end">مدیریت بودجه هوشمند</text>
+    <text x="353" y="38" fill="#FFFFFF" font-family="Vazirmatn, sans-serif" font-size="18" font-weight="800" text-anchor="end">خرج امن روزانه و اهداف</text>
+  </g>
+
+  <!-- Large Central Safe to Spend Radial Gauge Card -->
+  <g id="CentralGaugeCard" transform="translate(20, 110)">
+    <rect width="353" height="230" rx="24" fill="url(#glassCardGrad)" stroke="#334155" stroke-width="1"/>
+
+    <!-- Large Gauge Circle -->
+    <circle cx="176" cy="100" r="68" fill="none" stroke="#1E293B" stroke-width="12"/>
+    <path d="M 128 148 A 68 68 0 1 1 224 148" fill="none" stroke="url(#neonCyanEmerald)" stroke-width="12" stroke-linecap="round" filter="url(#neonGlow)"/>
+
+    <text x="176" y="85" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="12" text-anchor="middle">سقف خرج امروز</text>
+    <text x="176" y="115" fill="#FFFFFF" font-family="Vazirmatn, sans-serif" font-size="24" font-weight="900" text-anchor="middle">۴۸۰,۰۰۰</text>
+    <text x="176" y="132" fill="#00F2FE" font-family="Vazirmatn, sans-serif" font-size="11" font-weight="600" text-anchor="middle">تومان / روز</text>
+
+    <!-- Payday Info Pill -->
+    <rect x="76" y="185" width="200" height="30" rx="15" fill="#10B981" fill-opacity="0.12"/>
+    <text x="176" y="204" fill="#34D399" font-family="Vazirmatn, sans-serif" font-size="11" font-weight="700" text-anchor="middle">🗓️ ۱۲ روز تا حقوق بعدی (۲۵ آبان)</text>
+  </g>
+
+  <!-- Financial Period Breakdown Metrics -->
+  <g id="PeriodBreakdown" transform="translate(20, 355)">
+    <!-- Income -->
+    <rect x="238" y="0" width="115" height="74" rx="16" fill="#141C2E" stroke="#1E293B" stroke-width="1"/>
+    <text x="340" y="26" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="11" text-anchor="end">کل دریافتی دوره</text>
+    <text x="340" y="52" fill="#10B981" font-family="Vazirmatn, sans-serif" font-size="14" font-weight="800" text-anchor="end">۲۲,۰۰۰,۰۰۰</text>
+
+    <!-- Fixed Commitments -->
+    <rect x="119" y="0" width="115" height="74" rx="16" fill="#141C2E" stroke="#1E293B" stroke-width="1"/>
+    <text x="221" y="26" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="11" text-anchor="end">تعهدات ثابت</text>
+    <text x="221" y="52" fill="#F43F5E" font-family="Vazirmatn, sans-serif" font-size="14" font-weight="800" text-anchor="end">-۶,۵۰۰,۰۰۰</text>
+
+    <!-- Safe Pool -->
+    <rect x="0" y="0" width="115" height="74" rx="16" fill="#141C2E" stroke="#1E293B" stroke-width="1"/>
+    <text x="102" y="26" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="11" text-anchor="end">بودجه آزاد</text>
+    <text x="102" y="52" fill="#00F2FE" font-family="Vazirmatn, sans-serif" font-size="14" font-weight="800" text-anchor="end">۱۵,۵۰۰,۰۰۰</text>
+  </g>
+
+  <!-- Savings Goals Section (Sinking Funds) -->
+  <g id="SavingsGoalsSection" transform="translate(20, 450)">
+    <Row>
+      <text x="353" y="16" fill="#FFFFFF" font-family="Vazirmatn, sans-serif" font-size="16" font-weight="800" text-anchor="end">قلک‌ها و اهداف پس‌انداز</text>
+      <text x="0" y="16" fill="#00F2FE" font-family="Vazirmatn, sans-serif" font-size="12" font-weight="600">+ هدف جدید</text>
+    </Row>
+
+    <!-- Goal Item 1: MacBook Pro -->
+    <g transform="translate(0, 32)">
+      <rect width="353" height="96" rx="18" fill="url(#glassCardGrad)" stroke="#334155" stroke-width="1"/>
+      <circle cx="318" cy="36" r="18" fill="#8B5CF6" fill-opacity="0.2"/>
+      <text x="318" y="42" font-size="18" text-anchor="middle">💻</text>
+      <text x="288" y="32" fill="#FFFFFF" font-family="Vazirmatn, sans-serif" font-size="14" font-weight="700" text-anchor="end">خرید مک‌بوک پرو M3</text>
+      <text x="288" y="50" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="11" text-anchor="end">هدف: ۹۰ میلیون • تا پایان بهمن</text>
+      
+      <!-- Progress Value -->
+      <text x="24" y="36" fill="#34D399" font-family="Vazirmatn, sans-serif" font-size="13" font-weight="800">۶۷,۵۰۰,۰۰۰ <tspan font-size="10" fill="#94A3B8">(۷۵٪)</tspan></text>
+
+      <!-- Progress Bar Track -->
+      <rect x="24" y="66" width="305" height="8" rx="4" fill="#1E293B"/>
+      <!-- Progress Bar Fill -->
+      <rect x="100" y="66" width="229" height="8" rx="4" fill="url(#neonCyanEmerald)" filter="url(#neonGlow)"/>
+    </g>
+
+    <!-- Goal Item 2: Norooz Travel -->
+    <g transform="translate(0, 142)">
+      <rect width="353" height="96" rx="18" fill="url(#glassCardGrad)" stroke="#334155" stroke-width="1"/>
+      <circle cx="318" cy="36" r="18" fill="#EC4899" fill-opacity="0.2"/>
+      <text x="318" y="42" font-size="18" text-anchor="middle">✈️</text>
+      <text x="288" y="32" fill="#FFFFFF" font-family="Vazirmatn, sans-serif" font-size="14" font-weight="700" text-anchor="end">سفر نوروز ۱۴۰۶</text>
+      <text x="288" y="50" fill="#94A3B8" font-family="Vazirmatn, sans-serif" font-size="11" text-anchor="end">هدف: ۳۰ میلیون • تا ۲۸ اسفند</text>
+
+      <!-- Progress Value -->
+      <text x="24" y="36" fill="#EC4899" font-family="Vazirmatn, sans-serif" font-size="13" font-weight="800">۱۲,۰۰۰,۰۰۰ <tspan font-size="10" fill="#94A3B8">(۴۰٪)</tspan></text>
+
+      <!-- Progress Bar Track -->
+      <rect x="24" y="66" width="305" height="8" rx="4" fill="#1E293B"/>
+      <!-- Progress Bar Fill -->
+      <rect x="203" y="66" width="126" height="8" rx="4" fill="url(#neonPurplePink)"/>
+    </g>
+
+    <!-- Add Money to Goals CTA Button -->
+    <g transform="translate(0, 252)">
+      <rect width="353" height="48" rx="14" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="176" y="29" fill="#E2E8F0" font-family="Vazirmatn, sans-serif" font-size="13" font-weight="700" text-anchor="middle">+ انتقال واریزی به قلک پس‌انداز</text>
+    </g>
+  </g>
+</svg>

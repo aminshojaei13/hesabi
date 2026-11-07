@@ -5,7 +5,25 @@ import com.braveboy.hesabi.data.local.HesabiDatabase
 import com.braveboy.hesabi.data.local.dao.AccountDao
 import com.braveboy.hesabi.data.local.dao.BudgetDao
 import com.braveboy.hesabi.data.local.dao.CategoryDao
+import com.braveboy.hesabi.data.local.dao.ChequeDao
+import com.braveboy.hesabi.data.local.dao.DebtDao
+import com.braveboy.hesabi.data.local.dao.InstallmentDao
+import com.braveboy.hesabi.data.local.dao.LoanDao
+import com.braveboy.hesabi.data.local.dao.PersonDao
+import com.braveboy.hesabi.data.local.dao.RecurringTransactionDao
+import com.braveboy.hesabi.data.local.dao.SavingsGoalDao
 import com.braveboy.hesabi.data.local.dao.TransactionDao
+import com.braveboy.hesabi.data.local.entity.AccountEntity
+import com.braveboy.hesabi.data.local.entity.BudgetEntity
+import com.braveboy.hesabi.data.local.entity.CategoryEntity
+import com.braveboy.hesabi.data.local.entity.ChequeEntity
+import com.braveboy.hesabi.data.local.entity.DebtEntity
+import com.braveboy.hesabi.data.local.entity.InstallmentEntity
+import com.braveboy.hesabi.data.local.entity.LoanEntity
+import com.braveboy.hesabi.data.local.entity.PersonEntity
+import com.braveboy.hesabi.data.local.entity.RecurringTransactionEntity
+import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
+import com.braveboy.hesabi.data.local.entity.TransactionEntity
 import com.braveboy.hesabi.data.local.toDomain
 import com.braveboy.hesabi.data.local.toEntity
 import com.braveboy.hesabi.domain.model.BackupSummary
@@ -22,6 +40,13 @@ class BackupManager(
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
     private val budgetDao: BudgetDao,
+    private val savingsGoalDao: SavingsGoalDao,
+    private val personDao: PersonDao,
+    private val debtDao: DebtDao,
+    private val chequeDao: ChequeDao,
+    private val loanDao: LoanDao,
+    private val installmentDao: InstallmentDao,
+    private val recurringTransactionDao: RecurringTransactionDao,
     private val settingsRepository: SettingsRepository,
     private val appVersion: String,
 ) : BackupRepository {
@@ -71,6 +96,7 @@ class BackupManager(
                     note = it.note,
                     source = it.source,
                     externalRef = it.externalRef,
+                    receiptImagePath = it.receiptImagePath,
                     createdAtMillis = it.createdAtMillis,
                     updatedAtMillis = it.updatedAtMillis,
                 )
@@ -81,6 +107,100 @@ class BackupManager(
                     categoryId = it.categoryId,
                     periodKey = it.periodKey,
                     limitToman = it.limitToman,
+                )
+            },
+            savingsGoals = savingsGoalDao.getAll().map {
+                SavingsGoalDto(
+                    id = it.id,
+                    title = it.title,
+                    targetAmountToman = it.targetAmountToman,
+                    savedAmountToman = it.savedAmountToman,
+                    colorArgb = it.colorArgb,
+                    iconKey = it.iconKey,
+                    targetDateEpochDay = it.targetDateEpochDay,
+                    isCompleted = it.isCompleted,
+                    createdAtMillis = it.createdAtMillis,
+                )
+            },
+            people = personDao.getAll().map {
+                PersonDto(
+                    id = it.id,
+                    name = it.name,
+                    phoneNumber = it.phoneNumber,
+                    notes = it.notes,
+                    createdAtMillis = it.createdAtMillis,
+                )
+            },
+            debts = debtDao.getAll().map {
+                DebtDto(
+                    id = it.id,
+                    personId = it.personId,
+                    amountToman = it.amountToman,
+                    settledAmountToman = it.settledAmountToman,
+                    direction = it.direction,
+                    dueEpochDay = it.dueEpochDay,
+                    note = it.note,
+                    isSettled = it.isSettled,
+                    createdAtMillis = it.createdAtMillis,
+                )
+            },
+            cheques = chequeDao.getAll().map {
+                ChequeDto(
+                    id = it.id,
+                    sayadNumber = it.sayadNumber,
+                    bankName = it.bankName,
+                    amountToman = it.amountToman,
+                    dueEpochDay = it.dueEpochDay,
+                    payeeOrDrawerName = it.payeeOrDrawerName,
+                    direction = it.direction,
+                    status = it.status,
+                    note = it.note,
+                    createdAtMillis = it.createdAtMillis,
+                )
+            },
+            loans = loanDao.getAll().map {
+                LoanDto(
+                    id = it.id,
+                    title = it.title,
+                    totalAmountToman = it.totalAmountToman,
+                    installmentCount = it.installmentCount,
+                    installmentAmountToman = it.installmentAmountToman,
+                    accountId = it.accountId,
+                    firstDueEpochDay = it.firstDueEpochDay,
+                    note = it.note,
+                    isCompleted = it.isCompleted,
+                    createdAtMillis = it.createdAtMillis,
+                )
+            },
+            installments = installmentDao.getAll().map {
+                InstallmentDto(
+                    id = it.id,
+                    loanId = it.loanId,
+                    installmentNumber = it.installmentNumber,
+                    amountToman = it.amountToman,
+                    dueEpochDay = it.dueEpochDay,
+                    isPaid = it.isPaid,
+                    paidAtEpochDay = it.paidAtEpochDay,
+                )
+            },
+            recurringTransactions = recurringTransactionDao.getAll().map {
+                RecurringTransactionDto(
+                    id = it.id,
+                    title = it.title,
+                    type = it.type,
+                    amountToman = it.amountToman,
+                    accountId = it.accountId,
+                    toAccountId = it.toAccountId,
+                    categoryId = it.categoryId,
+                    frequency = it.frequency,
+                    interval = it.interval,
+                    dayOfMonth = it.dayOfMonth,
+                    nextOccurrenceEpochDay = it.nextOccurrenceEpochDay,
+                    lastAppliedEpochDay = it.lastAppliedEpochDay,
+                    autoApply = it.autoApply,
+                    isActive = it.isActive,
+                    note = it.note,
+                    createdAtMillis = it.createdAtMillis,
                 )
             },
         )
@@ -115,12 +235,10 @@ class BackupManager(
         if (envelope.accounts.isEmpty()) throw BackupException("فایل پشتیبان حساب ندارد.")
 
         val accounts = envelope.accounts.map {
-            com.braveboy.hesabi.domain.model.Account(
+            AccountEntity(
                 id = it.id,
                 name = it.name,
-                kind = com.braveboy.hesabi.domain.model.AccountKind.entries
-                    .firstOrNull { kind -> kind.name == it.kind }
-                    ?: com.braveboy.hesabi.domain.model.AccountKind.CASH,
+                kind = it.kind,
                 colorArgb = it.colorArgb,
                 openingBalanceToman = it.openingBalanceToman,
                 archived = it.archived,
@@ -128,12 +246,10 @@ class BackupManager(
             )
         }
         val categories = envelope.categories.map {
-            com.braveboy.hesabi.domain.model.Category(
+            CategoryEntity(
                 id = it.id,
                 name = it.name,
-                kind = com.braveboy.hesabi.domain.model.CategoryKind.entries
-                    .firstOrNull { kind -> kind.name == it.kind }
-                    ?: com.braveboy.hesabi.domain.model.CategoryKind.EXPENSE,
+                kind = it.kind,
                 iconKey = it.iconKey,
                 colorArgb = it.colorArgb,
                 archived = it.archived,
@@ -141,44 +257,150 @@ class BackupManager(
             )
         }
         val transactions = envelope.transactions.map {
-            com.braveboy.hesabi.domain.model.Transaction(
+            TransactionEntity(
                 id = it.id,
-                type = com.braveboy.hesabi.domain.model.TransactionType.entries
-                    .firstOrNull { type -> type.name == it.type }
-                    ?: com.braveboy.hesabi.domain.model.TransactionType.EXPENSE,
+                type = it.type,
                 amountToman = it.amountToman,
                 accountId = it.accountId,
                 toAccountId = it.toAccountId,
                 categoryId = it.categoryId,
                 occurredOnEpochDay = it.occurredOnEpochDay,
                 note = it.note,
-                source = com.braveboy.hesabi.domain.model.TransactionSource.entries
-                    .firstOrNull { source -> source.name == it.source }
-                    ?: com.braveboy.hesabi.domain.model.TransactionSource.IMPORT,
+                source = it.source,
                 externalRef = it.externalRef,
+                receiptImagePath = it.receiptImagePath,
                 createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
                 updatedAtMillis = if (it.updatedAtMillis == 0L) envelope.exportedAtMillis else it.updatedAtMillis,
             )
         }
         val budgets = envelope.budgets.map {
-            com.braveboy.hesabi.domain.model.Budget(
+            BudgetEntity(
                 id = it.id,
                 categoryId = it.categoryId,
                 periodKey = it.periodKey,
                 limitToman = it.limitToman,
             )
         }
+        val savingsGoals = envelope.savingsGoals.map {
+            SavingsGoalEntity(
+                id = it.id,
+                title = it.title,
+                targetAmountToman = it.targetAmountToman,
+                savedAmountToman = it.savedAmountToman,
+                colorArgb = it.colorArgb,
+                iconKey = it.iconKey,
+                targetDateEpochDay = it.targetDateEpochDay,
+                isCompleted = it.isCompleted,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
+        val people = envelope.people.map {
+            PersonEntity(
+                id = it.id,
+                name = it.name,
+                phoneNumber = it.phoneNumber,
+                notes = it.notes,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
+        val debts = envelope.debts.map {
+            DebtEntity(
+                id = it.id,
+                personId = it.personId,
+                amountToman = it.amountToman,
+                settledAmountToman = it.settledAmountToman,
+                direction = it.direction,
+                dueEpochDay = it.dueEpochDay,
+                note = it.note,
+                isSettled = it.isSettled,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
+        val cheques = envelope.cheques.map {
+            ChequeEntity(
+                id = it.id,
+                sayadNumber = it.sayadNumber,
+                bankName = it.bankName,
+                amountToman = it.amountToman,
+                dueEpochDay = it.dueEpochDay,
+                payeeOrDrawerName = it.payeeOrDrawerName,
+                direction = it.direction,
+                status = it.status,
+                note = it.note,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
+        val loans = envelope.loans.map {
+            LoanEntity(
+                id = it.id,
+                title = it.title,
+                totalAmountToman = it.totalAmountToman,
+                installmentCount = it.installmentCount,
+                installmentAmountToman = it.installmentAmountToman,
+                accountId = it.accountId,
+                firstDueEpochDay = it.firstDueEpochDay,
+                note = it.note,
+                isCompleted = it.isCompleted,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
+        val installments = envelope.installments.map {
+            InstallmentEntity(
+                id = it.id,
+                loanId = it.loanId,
+                installmentNumber = it.installmentNumber,
+                amountToman = it.amountToman,
+                dueEpochDay = it.dueEpochDay,
+                isPaid = it.isPaid,
+                paidAtEpochDay = it.paidAtEpochDay,
+            )
+        }
+        val recurringTransactions = envelope.recurringTransactions.map {
+            RecurringTransactionEntity(
+                id = it.id,
+                title = it.title,
+                type = it.type,
+                amountToman = it.amountToman,
+                accountId = it.accountId,
+                toAccountId = it.toAccountId,
+                categoryId = it.categoryId,
+                frequency = it.frequency,
+                interval = it.interval,
+                dayOfMonth = it.dayOfMonth,
+                nextOccurrenceEpochDay = it.nextOccurrenceEpochDay,
+                lastAppliedEpochDay = it.lastAppliedEpochDay,
+                autoApply = it.autoApply,
+                isActive = it.isActive,
+                note = it.note,
+                createdAtMillis = if (it.createdAtMillis == 0L) envelope.exportedAtMillis else it.createdAtMillis,
+            )
+        }
 
         // Replace-all inside one transaction: a bad file can never leave half a restore.
         db.withTransaction {
+            recurringTransactionDao.deleteAll()
+            installmentDao.deleteAll()
+            loanDao.deleteAll()
+            chequeDao.deleteAll()
+            debtDao.deleteAll()
+            personDao.deleteAll()
+            savingsGoalDao.deleteAll()
             transactionDao.deleteAll()
             budgetDao.deleteAll()
             categoryDao.deleteAll()
             accountDao.deleteAll()
-            accountDao.upsertAll(accounts.map { it.toEntity() })
-            categoryDao.upsertAll(categories.map { it.toEntity() })
-            transactionDao.upsertAll(transactions.map { it.toEntity() })
-            budgetDao.upsertAll(budgets.map { it.toEntity() })
+
+            accountDao.upsertAll(accounts)
+            categoryDao.upsertAll(categories)
+            transactionDao.upsertAll(transactions)
+            budgetDao.upsertAll(budgets)
+            if (savingsGoals.isNotEmpty()) savingsGoalDao.upsertAll(savingsGoals)
+            if (people.isNotEmpty()) personDao.upsertAll(people)
+            if (debts.isNotEmpty()) debtDao.upsertAll(debts)
+            if (cheques.isNotEmpty()) chequeDao.upsertAll(cheques)
+            if (loans.isNotEmpty()) loanDao.upsertAll(loans)
+            if (installments.isNotEmpty()) installmentDao.upsertAll(installments)
+            if (recurringTransactions.isNotEmpty()) recurringTransactionDao.upsertAll(recurringTransactions)
         }
 
         val defaultAccountId = settingsRepository.current().defaultAccountId

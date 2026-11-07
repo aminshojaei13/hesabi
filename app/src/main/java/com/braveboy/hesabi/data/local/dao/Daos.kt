@@ -236,6 +236,9 @@ interface SavingsGoalDao {
     @Upsert
     suspend fun upsert(goal: SavingsGoalEntity)
 
+    @Upsert
+    suspend fun upsertAll(goals: List<SavingsGoalEntity>)
+
     @Query("DELETE FROM savings_goals WHERE id = :id")
     suspend fun deleteById(id: String)
 
@@ -260,6 +263,9 @@ interface PersonDao {
     @Upsert
     suspend fun upsert(person: PersonEntity)
 
+    @Upsert
+    suspend fun upsertAll(people: List<PersonEntity>)
+
     @Query("DELETE FROM people WHERE id = :id")
     suspend fun deleteById(id: String)
 
@@ -278,11 +284,17 @@ interface DebtDao {
     @Query("SELECT * FROM debts ORDER BY createdAtMillis DESC")
     fun observeAll(): Flow<List<DebtEntity>>
 
+    @Query("SELECT * FROM debts")
+    suspend fun getAll(): List<DebtEntity>
+
     @Query("SELECT * FROM debts WHERE id = :id")
     suspend fun findById(id: String): DebtEntity?
 
     @Upsert
     suspend fun upsert(debt: DebtEntity)
+
+    @Upsert
+    suspend fun upsertAll(debts: List<DebtEntity>)
 
     @Query("UPDATE debts SET settledAmountToman = :settledAmount, isSettled = :isSettled WHERE id = :id")
     suspend fun updateSettlement(id: String, settledAmount: Long, isSettled: Boolean)
@@ -314,6 +326,9 @@ interface ChequeDao {
     @Upsert
     suspend fun upsert(cheque: ChequeEntity)
 
+    @Upsert
+    suspend fun upsertAll(cheques: List<ChequeEntity>)
+
     @Query("UPDATE cheques SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: String)
 
@@ -337,6 +352,9 @@ interface LoanDao {
 
     @Upsert
     suspend fun upsert(loan: LoanEntity)
+
+    @Upsert
+    suspend fun upsertAll(loans: List<LoanEntity>)
 
     @Query("UPDATE loans SET isCompleted = :isCompleted WHERE id = :id")
     suspend fun updateCompleted(id: String, isCompleted: Boolean)
@@ -400,6 +418,9 @@ interface RecurringTransactionDao {
 
     @Upsert
     suspend fun upsert(recurring: RecurringTransactionEntity)
+
+    @Upsert
+    suspend fun upsertAll(recurring: List<RecurringTransactionEntity>)
 
     @Query("UPDATE recurring_transactions SET lastAppliedEpochDay = :appliedDay, nextOccurrenceEpochDay = :nextDay WHERE id = :id")
     suspend fun updateOccurrence(id: String, appliedDay: Long, nextDay: Long)

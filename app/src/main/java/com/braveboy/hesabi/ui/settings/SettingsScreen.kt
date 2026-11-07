@@ -72,6 +72,7 @@ fun SettingsScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
     var showPaydayPicker by remember { mutableStateOf(false) }
+    var showSalarySetup by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -101,6 +102,7 @@ fun SettingsScreen(
         onAmountsAreRial = viewModel::setAmountsAreRial,
         onPickAccount = { showAccountPicker = true },
         onPickPayday = { showPaydayPicker = true },
+        onSetupSalary = { showSalarySetup = true },
         onSetupPin = { showPinSetup = true },
         onDisableAppLock = { viewModel.setAppLockEnabled(false) },
         onBiometricToggle = viewModel::setBiometricEnabled,
@@ -109,6 +111,24 @@ fun SettingsScreen(
         onDismissMessage = viewModel::dismissMessage,
         modifier = modifier,
     )
+
+    if (showSalarySetup) {
+        SalarySetupDialog(
+            initialSalaryToman = state.settings.monthlySalaryToman,
+            initialPayday = state.settings.paydayDayOfMonth,
+            initialAccountId = state.settings.salaryAccountId ?: state.settings.defaultAccountId,
+            initialAutoDeposit = state.settings.autoDepositSalary,
+            accounts = state.accounts,
+            onDismiss = { showSalarySetup = false },
+            onSave = { salary, payday, accountId, autoDeposit ->
+                viewModel.setMonthlySalary(salary)
+                viewModel.setPaydayDayOfMonth(payday)
+                viewModel.setSalaryAccountId(accountId)
+                viewModel.setAutoDepositSalary(autoDeposit)
+                showSalarySetup = false
+            },
+        )
+    }
 
     if (showAccountPicker) {
         AlertDialog(
@@ -237,6 +257,7 @@ fun SettingsContent(
     onAmountsAreRial: (Boolean) -> Unit,
     onPickAccount: () -> Unit,
     onPickPayday: () -> Unit,
+    onSetupSalary: () -> Unit,
     onSetupPin: () -> Unit,
     onDisableAppLock: () -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
@@ -317,18 +338,22 @@ fun SettingsContent(
             )
         }
         HesabiCard {
-            SectionHeader("پیش‌فرض‌ها و چرخهٔ مالی")
+            SectionHeader("حقوق ماهانه و کنترل نقدینگی")
+            SettingsRow(
+                title = "حقوق ماهانه و چرخه نقدینگی",
+                subtitle = if (settings.monthlySalaryToman > 0) {
+                    "${com.braveboy.hesabi.core.money.Money.format(settings.monthlySalaryToman, withUnit = true)} • ${Digits.toPersian(settings.paydayDayOfMonth.toString())}ام ماه"
+                } else {
+                    "ثبت نشده (تعیین حقوق پایه جهت کنترل نقدینگی)"
+                },
+                icon = Icons.Rounded.Payments,
+                onClick = onSetupSalary,
+            )
             SettingsRow(
                 title = "حساب پیش‌فرض",
                 subtitle = state.accounts.firstOrNull { it.id == settings.defaultAccountId }?.name ?: "انتخاب نشده",
                 icon = Icons.Rounded.AccountBalanceWallet,
                 onClick = onPickAccount,
-            )
-            SettingsRow(
-                title = "روز دریافت حقوق (مبدأ چرخهٔ مالی)",
-                subtitle = if (settings.paydayDayOfMonth == 1) "اول هر ماه (تقویم رسمی)" else "${Digits.toPersian(settings.paydayDayOfMonth.toString())}ام هر ماه",
-                icon = Icons.Rounded.Payments,
-                onClick = onPickPayday,
             )
         }
         HesabiCard {
@@ -448,7 +473,7 @@ private fun SettingsPreview() {
     HesabiTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }
@@ -467,6 +492,7 @@ private fun SettingsDarkPreview() {
             Surface(modifier = Modifier.fillMaxSize()) {
                 SettingsContent(
                     SettingsUiState(accounts = PreviewData.accounts),
+                    {},
                     {},
                     {},
                     {},

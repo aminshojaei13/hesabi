@@ -53,4 +53,39 @@ class PaydayCycleCalculatorTest {
         assertEquals(1_000_000L, safe.safeToSpendTodayToman)
         assertEquals(BurnRateStatus.EXCELLENT, safe.burnRateStatus)
     }
+
+    @Test
+    fun `liquidity forecast calculates net disposable and daily runway accurately`() {
+        val date = JalaliDate(1403, 8, 11)
+        val cycle = PaydayCycleCalculator.calculateCycle(today = date, paydayDay = 1) // 20 days left
+        val forecast = PaydayCycleCalculator.calculateLiquidityForecast(
+            monthlySalaryToman = 30_000_000L,
+            fixedCommitmentsToman = 6_000_000L,
+            currentCycleExpenseToman = 4_000_000L,
+            cycle = cycle,
+        )
+
+        // Net disposable = 30,000,000 - 6,000,000 - 4,000,000 = 20,000,000
+        assertEquals(20_000_000L, forecast.netDisposableToman)
+        // Daily runway = 20,000,000 / 20 days = 1,000,000
+        assertEquals(1_000_000L, forecast.dailyRunwayToman)
+        assertEquals(20, forecast.daysRemaining)
+        assertEquals(BurnRateStatus.NORMAL, forecast.runwayStatus)
+    }
+
+    @Test
+    fun `liquidity forecast marks danger when expenses and commitments exceed salary`() {
+        val date = JalaliDate(1403, 8, 15)
+        val cycle = PaydayCycleCalculator.calculateCycle(today = date, paydayDay = 1)
+        val forecast = PaydayCycleCalculator.calculateLiquidityForecast(
+            monthlySalaryToman = 20_000_000L,
+            fixedCommitmentsToman = 15_000_000L,
+            currentCycleExpenseToman = 10_000_000L,
+            cycle = cycle,
+        )
+
+        assertEquals(0L, forecast.netDisposableToman)
+        assertEquals(0L, forecast.dailyRunwayToman)
+        assertEquals(BurnRateStatus.DANGER, forecast.runwayStatus)
+    }
 }

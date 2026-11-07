@@ -1,6 +1,5 @@
 package com.braveboy.hesabi.ui.home
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.TrendingDown
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,12 +58,14 @@ import com.braveboy.hesabi.ui.components.DailySafeToSpendWidget
 import com.braveboy.hesabi.ui.components.EmptyState
 import com.braveboy.hesabi.ui.components.GoalDepositWithdrawDialog
 import com.braveboy.hesabi.ui.components.MonthSwitcher
+import com.braveboy.hesabi.ui.components.MonthlySalaryLiquidityCard
 import com.braveboy.hesabi.ui.components.PendingSmsBanner
 import com.braveboy.hesabi.ui.components.SavingsGoalsSection
 import com.braveboy.hesabi.ui.components.SectionHeader
 import com.braveboy.hesabi.ui.components.TransactionRow
 import com.braveboy.hesabi.ui.hesabiViewModel
 import com.braveboy.hesabi.ui.preview.PreviewData
+import com.braveboy.hesabi.ui.settings.SalarySetupDialog
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.HesabiTheme
 import com.braveboy.hesabi.ui.theme.LocalHesabiSemantic
@@ -86,6 +88,7 @@ fun HomeScreen(
     var activeGoalForDeposit by remember { mutableStateOf<SavingsGoal?>(null) }
     var activeGoalForEdit by remember { mutableStateOf<SavingsGoal?>(null) }
     var showCreateGoalDialog by remember { mutableStateOf(false) }
+    var showSalaryDialog by remember { mutableStateOf(false) }
 
     HomeContent(
         state = state,
@@ -99,10 +102,26 @@ fun HomeScreen(
         onOpenBudget = onOpenBudget,
         onOpenSettings = onOpenSettings,
         onOpenVoice = onOpenVoice,
+        onOpenSalarySetup = { showSalaryDialog = true },
         onAddGoal = { showCreateGoalDialog = true },
         onGoalClick = { goal -> activeGoalForDeposit = goal },
         modifier = modifier,
     )
+
+    if (showSalaryDialog) {
+        SalarySetupDialog(
+            initialSalaryToman = state.monthlySalaryToman,
+            initialPayday = state.paydayDayOfMonth,
+            initialAccountId = state.salaryAccountId,
+            initialAutoDeposit = state.autoDepositSalary,
+            accounts = state.balances.map { it.account },
+            onDismiss = { showSalaryDialog = false },
+            onSave = { salary, payday, accId, autoDeposit ->
+                viewModel.updateSalarySettings(salary, payday, accId, autoDeposit)
+                showSalaryDialog = false
+            },
+        )
+    }
 
     if (activeGoalForDeposit != null) {
         GoalDepositWithdrawDialog(
@@ -147,6 +166,7 @@ fun HomeContent(
     onOpenBudget: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenVoice: () -> Unit = {},
+    onOpenSalarySetup: () -> Unit = {},
     onAddGoal: () -> Unit = {},
     onGoalClick: (SavingsGoal) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -289,14 +309,14 @@ fun HomeContent(
                 )
                 QuickAction(
                     label = "هزینه",
-                    icon = Icons.Rounded.TrendingDown,
+                    icon = Icons.AutoMirrored.Rounded.TrendingDown,
                     color = LocalHesabiSemantic.current.expense,
                     onClick = { onAdd(TransactionType.EXPENSE) },
                     modifier = Modifier.weight(1f),
                 )
                 QuickAction(
                     label = "درآمد",
-                    icon = Icons.Rounded.TrendingUp,
+                    icon = Icons.AutoMirrored.Rounded.TrendingUp,
                     color = LocalHesabiSemantic.current.income,
                     onClick = { onAdd(TransactionType.INCOME) },
                     modifier = Modifier.weight(1f),
@@ -309,6 +329,12 @@ fun HomeContent(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+        item {
+            MonthlySalaryLiquidityCard(
+                forecast = state.liquidityForecast,
+                onSetupSalary = onOpenSalarySetup,
+            )
         }
         if (state.safeToSpend != null) {
             item {
@@ -449,8 +475,17 @@ private fun HomePreview() {
         balances = PreviewData.balances,
         pendingSmsCount = 2,
         loading = false,
+        monthlySalaryToman = 25_000_000L,
+        liquidityForecast = com.braveboy.hesabi.domain.logic.LiquidityForecast(
+            monthlySalaryToman = 25_000_000L,
+            fixedCommitmentsToman = 5_000_000L,
+            netDisposableToman = 16_800_000L,
+            daysRemaining = 18,
+            dailyRunwayToman = 933_000L,
+            runwayStatus = com.braveboy.hesabi.domain.logic.BurnRateStatus.NORMAL,
+        ),
     )
-    HesabiTheme {
+    HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.LIGHT) {
         androidx.compose.runtime.CompositionLocalProvider(
             LocalLayoutDirection provides LayoutDirection.Rtl,
         ) {
@@ -466,6 +501,7 @@ private fun HomePreview() {
                     onOpenSms = {},
                     onOpenBudget = {},
                     onOpenSettings = {},
+                    onOpenSalarySetup = {},
                 )
             }
         }
@@ -504,6 +540,7 @@ private fun HomeEmptyPreview() {
                     onOpenSms = {},
                     onOpenBudget = {},
                     onOpenSettings = {},
+                    onOpenSalarySetup = {},
                 )
             }
         }
