@@ -16,12 +16,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.DeleteForever
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -39,10 +37,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.money.Currency
+import com.braveboy.hesabi.core.money.Digits
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.domain.model.AppSettings
 import com.braveboy.hesabi.domain.model.ThemeMode
@@ -70,6 +68,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showClearConfirm by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
+    var showPaydayPicker by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
@@ -97,6 +96,7 @@ fun SettingsScreen(
         },
         onAmountsAreRial = viewModel::setAmountsAreRial,
         onPickAccount = { showAccountPicker = true },
+        onPickPayday = { showPaydayPicker = true },
         onClearData = { showClearConfirm = true },
         onDismissMessage = viewModel::dismissMessage,
         modifier = modifier,
@@ -151,6 +151,46 @@ fun SettingsScreen(
         )
     }
 
+    if (showPaydayPicker) {
+        val commonPaydays = listOf(1, 20, 25, 26, 28, 30)
+        AlertDialog(
+            onDismissRequest = { showPaydayPicker = false },
+            title = { Text("روز دریافت حقوق") },
+            text = {
+                Column {
+                    Text(
+                        text = "محاسبه خرج امن امروز و دوره مالی بر اساس این روز انجام می‌شود.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = HesabiSpacing.sm),
+                    )
+                    commonPaydays.forEach { day ->
+                        val isSelected = state.settings.paydayDayOfMonth == day
+                        SettingsRow(
+                            title = if (day == 1) "اول هر ماه (تقویم رسمی)" else "${Digits.toPersian(day.toString())}ام هر ماه",
+                            trailing = {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.setPaydayDayOfMonth(day)
+                                        showPaydayPicker = false
+                                    },
+                                )
+                            },
+                            onClick = {
+                                viewModel.setPaydayDayOfMonth(day)
+                                showPaydayPicker = false
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPaydayPicker = false }) { Text("بستن") }
+            },
+        )
+    }
+
     if (showClearConfirm) {
         ConfirmDialog(
             title = "پاک کردن همهٔ داده‌ها",
@@ -178,6 +218,7 @@ fun SettingsContent(
     onSmsCapture: (Boolean) -> Unit,
     onAmountsAreRial: (Boolean) -> Unit,
     onPickAccount: () -> Unit,
+    onPickPayday: () -> Unit,
     onClearData: () -> Unit,
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
@@ -254,12 +295,18 @@ fun SettingsContent(
             )
         }
         HesabiCard {
-            SectionHeader("پیش‌فرض‌ها")
+            SectionHeader("پیش‌فرض‌ها و چرخهٔ مالی")
             SettingsRow(
                 title = "حساب پیش‌فرض",
                 subtitle = state.accounts.firstOrNull { it.id == settings.defaultAccountId }?.name ?: "انتخاب نشده",
                 icon = Icons.Rounded.AccountBalanceWallet,
                 onClick = onPickAccount,
+            )
+            SettingsRow(
+                title = "روز دریافت حقوق (مبدأ چرخهٔ مالی)",
+                subtitle = if (settings.paydayDayOfMonth == 1) "اول هر ماه (تقویم رسمی)" else "${Digits.toPersian(settings.paydayDayOfMonth.toString())}ام هر ماه",
+                icon = Icons.Rounded.Payments,
+                onClick = onPickPayday,
             )
         }
         HesabiCard {
@@ -345,7 +392,7 @@ private fun SettingsPreview() {
     HesabiTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }
@@ -364,7 +411,17 @@ private fun SettingsDarkPreview() {
             Surface(modifier = Modifier.fillMaxSize()) {
                 SettingsContent(
                     SettingsUiState(accounts = PreviewData.accounts),
-                    {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
                 )
             }
         }

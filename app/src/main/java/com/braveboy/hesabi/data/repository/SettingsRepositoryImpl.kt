@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -34,6 +35,7 @@ class SettingsRepositoryImpl(
         val amountsAreRial = booleanPreferencesKey("amounts_are_rial")
         val lastBackupAt = longPreferencesKey("last_backup_at")
         val defaultAccountId = stringPreferencesKey("default_account_id")
+        val paydayDayOfMonth = intPreferencesKey("payday_day_of_month")
     }
 
     override val settings: Flow<AppSettings> = context.hesabiSettings.data
@@ -49,6 +51,7 @@ class SettingsRepositoryImpl(
                 amountsAreRial = prefs[Keys.amountsAreRial] ?: true,
                 lastBackupAtMillis = prefs[Keys.lastBackupAt],
                 defaultAccountId = prefs[Keys.defaultAccountId],
+                paydayDayOfMonth = (prefs[Keys.paydayDayOfMonth] ?: 1).coerceIn(1, 31),
             )
         }
 
@@ -72,6 +75,10 @@ class SettingsRepositoryImpl(
 
     override suspend fun setDefaultAccountId(id: String?) = edit {
         if (id == null) it.remove(Keys.defaultAccountId) else it[Keys.defaultAccountId] = id
+    }
+
+    override suspend fun setPaydayDayOfMonth(day: Int) = edit {
+        it[Keys.paydayDayOfMonth] = day.coerceIn(1, 31)
     }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {

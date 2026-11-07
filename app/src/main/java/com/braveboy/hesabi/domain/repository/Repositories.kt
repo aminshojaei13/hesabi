@@ -8,6 +8,7 @@ import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.CategoryKind
 import com.braveboy.hesabi.domain.model.ImportResult
+import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
 import com.braveboy.hesabi.domain.model.Transaction
@@ -55,6 +56,17 @@ interface BudgetRepository {
     suspend fun delete(id: String)
 }
 
+interface SavingsGoalRepository {
+    fun observeAll(): Flow<List<SavingsGoal>>
+    fun observeActive(): Flow<List<SavingsGoal>>
+    suspend fun getAll(): List<SavingsGoal>
+    suspend fun getById(id: String): SavingsGoal?
+    suspend fun save(goal: SavingsGoal)
+    suspend fun delete(id: String)
+    suspend fun deposit(goalId: String, amountToman: Long)
+    suspend fun withdraw(goalId: String, amountToman: Long)
+}
+
 data class SmsAcceptInput(
     val eventId: String,
     val type: TransactionType,
@@ -99,6 +111,7 @@ interface SettingsRepository {
     suspend fun setAmountsAreRial(enabled: Boolean)
     suspend fun setLastBackupAt(millis: Long)
     suspend fun setDefaultAccountId(id: String?)
+    suspend fun setPaydayDayOfMonth(day: Int)
 }
 
 interface BackupRepository {

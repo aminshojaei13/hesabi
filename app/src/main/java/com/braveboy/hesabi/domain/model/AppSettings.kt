@@ -18,6 +18,7 @@ data class AppSettings(
     val amountsAreRial: Boolean = true,
     val lastBackupAtMillis: Long? = null,
     val defaultAccountId: String? = null,
+    val paydayDayOfMonth: Int = 1,
 )
 
 data class AccountWithBalance(

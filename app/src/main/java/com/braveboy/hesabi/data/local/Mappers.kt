@@ -5,6 +5,7 @@ import com.braveboy.hesabi.domain.model.AccountKind
 import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.CategoryKind
+import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
 import com.braveboy.hesabi.domain.model.SmsStatus
@@ -14,6 +15,7 @@ import com.braveboy.hesabi.domain.model.TransactionType
 import com.braveboy.hesabi.data.local.entity.AccountEntity
 import com.braveboy.hesabi.data.local.entity.BudgetEntity
 import com.braveboy.hesabi.data.local.entity.CategoryEntity
+import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
 import com.braveboy.hesabi.data.local.entity.TransactionEntity
@@ -137,3 +139,27 @@ fun SmsEvent.toEntity() = SmsEventEntity(
 fun SenderRuleEntity.toDomain() = SenderRule(sender = sender, ignored = ignored)
 
 fun SenderRule.toEntity() = SenderRuleEntity(sender = sender, ignored = ignored)
+
+fun SavingsGoalEntity.toDomain() = SavingsGoal(
+    id = id,
+    title = title,
+    targetAmountToman = targetAmountToman,
+    savedAmountToman = savedAmountToman,
+    colorArgb = colorArgb,
+    iconKey = iconKey,
+    targetDateEpochDay = targetDateEpochDay,
+    isCompleted = isCompleted,
+    createdAtMillis = createdAtMillis,
+)
+
+fun SavingsGoal.toEntity() = SavingsGoalEntity(
+    id = id,
+    title = title,
+    targetAmountToman = targetAmountToman,
+    savedAmountToman = savedAmountToman,
+    colorArgb = colorArgb,
+    iconKey = iconKey,
+    targetDateEpochDay = targetDateEpochDay,
+    isCompleted = isCompleted,
+    createdAtMillis = createdAtMillis,
+)
