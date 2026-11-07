@@ -5,6 +5,14 @@ import com.braveboy.hesabi.domain.model.AccountKind
 import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.CategoryKind
+import com.braveboy.hesabi.domain.model.Cheque
+import com.braveboy.hesabi.domain.model.ChequeDirection
+import com.braveboy.hesabi.domain.model.ChequeStatus
+import com.braveboy.hesabi.domain.model.Debt
+import com.braveboy.hesabi.domain.model.DebtDirection
+import com.braveboy.hesabi.domain.model.Installment
+import com.braveboy.hesabi.domain.model.Loan
+import com.braveboy.hesabi.domain.model.Person
 import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
@@ -15,6 +23,11 @@ import com.braveboy.hesabi.domain.model.TransactionType
 import com.braveboy.hesabi.data.local.entity.AccountEntity
 import com.braveboy.hesabi.data.local.entity.BudgetEntity
 import com.braveboy.hesabi.data.local.entity.CategoryEntity
+import com.braveboy.hesabi.data.local.entity.ChequeEntity
+import com.braveboy.hesabi.data.local.entity.DebtEntity
+import com.braveboy.hesabi.data.local.entity.InstallmentEntity
+import com.braveboy.hesabi.data.local.entity.LoanEntity
+import com.braveboy.hesabi.data.local.entity.PersonEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -162,4 +175,116 @@ fun SavingsGoal.toEntity() = SavingsGoalEntity(
     targetDateEpochDay = targetDateEpochDay,
     isCompleted = isCompleted,
     createdAtMillis = createdAtMillis,
+)
+
+fun PersonEntity.toDomain() = Person(
+    id = id,
+    name = name,
+    phoneNumber = phoneNumber,
+    notes = notes,
+    createdAtMillis = createdAtMillis,
+)
+
+fun Person.toEntity() = PersonEntity(
+    id = id,
+    name = name,
+    phoneNumber = phoneNumber,
+    notes = notes,
+    createdAtMillis = createdAtMillis,
+)
+
+fun DebtEntity.toDomain() = Debt(
+    id = id,
+    personId = personId,
+    amountToman = amountToman,
+    settledAmountToman = settledAmountToman,
+    direction = DebtDirection.entries.firstOrNull { it.name == direction } ?: DebtDirection.BORROWED,
+    dueEpochDay = dueEpochDay,
+    note = note,
+    isSettled = isSettled,
+    createdAtMillis = createdAtMillis,
+)
+
+fun Debt.toEntity() = DebtEntity(
+    id = id,
+    personId = personId,
+    amountToman = amountToman,
+    settledAmountToman = settledAmountToman,
+    direction = direction.name,
+    dueEpochDay = dueEpochDay,
+    note = note,
+    isSettled = isSettled,
+    createdAtMillis = createdAtMillis,
+)
+
+fun ChequeEntity.toDomain() = Cheque(
+    id = id,
+    sayadNumber = sayadNumber,
+    bankName = bankName,
+    amountToman = amountToman,
+    dueEpochDay = dueEpochDay,
+    payeeOrDrawerName = payeeOrDrawerName,
+    direction = ChequeDirection.entries.firstOrNull { it.name == direction } ?: ChequeDirection.ISSUED,
+    status = ChequeStatus.entries.firstOrNull { it.name == status } ?: ChequeStatus.PENDING,
+    note = note,
+    createdAtMillis = createdAtMillis,
+)
+
+fun Cheque.toEntity() = ChequeEntity(
+    id = id,
+    sayadNumber = sayadNumber,
+    bankName = bankName,
+    amountToman = amountToman,
+    dueEpochDay = dueEpochDay,
+    payeeOrDrawerName = payeeOrDrawerName,
+    direction = direction.name,
+    status = status.name,
+    note = note,
+    createdAtMillis = createdAtMillis,
+)
+
+fun LoanEntity.toDomain() = Loan(
+    id = id,
+    title = title,
+    totalAmountToman = totalAmountToman,
+    installmentCount = installmentCount,
+    installmentAmountToman = installmentAmountToman,
+    accountId = accountId,
+    firstDueEpochDay = firstDueEpochDay,
+    note = note,
+    isCompleted = isCompleted,
+    createdAtMillis = createdAtMillis,
+)
+
+fun Loan.toEntity() = LoanEntity(
+    id = id,
+    title = title,
+    totalAmountToman = totalAmountToman,
+    installmentCount = installmentCount,
+    installmentAmountToman = installmentAmountToman,
+    accountId = accountId,
+    firstDueEpochDay = firstDueEpochDay,
+    note = note,
+    isCompleted = isCompleted,
+    createdAtMillis = createdAtMillis,
+)
+
+fun InstallmentEntity.toDomain() = Installment(
+    id = id,
+    loanId = loanId,
+    installmentNumber = installmentNumber,
+    amountToman = amountToman,
+    dueEpochDay = dueEpochDay,
+    isPaid = isPaid,
+    paidAtEpochDay = paidAtEpochDay,
+)
+
+fun Installment.toEntity() = InstallmentEntity(
+    id = id,
+    loanId = loanId,
+    installmentNumber = installmentNumber,
+    amountToman = amountToman,
+    dueEpochDay = dueEpochDay,
+    isPaid = isPaid,
+    paidAtEpochDay = paidAtEpochDay,
 )

@@ -108,3 +108,94 @@ data class SavingsGoalEntity(
     val isCompleted: Boolean,
     val createdAtMillis: Long,
 )
+
+@Entity(
+    tableName = "people",
+    indices = [Index("name")],
+)
+data class PersonEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val phoneNumber: String,
+    val notes: String,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "debts",
+    indices = [
+        Index("personId"),
+        Index("isSettled"),
+        Index("dueEpochDay"),
+    ],
+)
+data class DebtEntity(
+    @PrimaryKey val id: String,
+    val personId: String,
+    val amountToman: Long,
+    val settledAmountToman: Long,
+    val direction: String,
+    val dueEpochDay: Long?,
+    val note: String,
+    val isSettled: Boolean,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "cheques",
+    indices = [
+        Index("dueEpochDay"),
+        Index("status"),
+        Index("direction"),
+    ],
+)
+data class ChequeEntity(
+    @PrimaryKey val id: String,
+    val sayadNumber: String,
+    val bankName: String,
+    val amountToman: Long,
+    val dueEpochDay: Long,
+    val payeeOrDrawerName: String,
+    val direction: String,
+    val status: String,
+    val note: String,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "loans",
+    indices = [
+        Index("isCompleted"),
+        Index("createdAtMillis"),
+    ],
+)
+data class LoanEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val totalAmountToman: Long,
+    val installmentCount: Int,
+    val installmentAmountToman: Long,
+    val accountId: String?,
+    val firstDueEpochDay: Long,
+    val note: String,
+    val isCompleted: Boolean,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "installments",
+    indices = [
+        Index("loanId"),
+        Index("dueEpochDay"),
+        Index("isPaid"),
+    ],
+)
+data class InstallmentEntity(
+    @PrimaryKey val id: String,
+    val loanId: String,
+    val installmentNumber: Int,
+    val amountToman: Long,
+    val dueEpochDay: Long,
+    val isPaid: Boolean,
+    val paidAtEpochDay: Long?,
+)

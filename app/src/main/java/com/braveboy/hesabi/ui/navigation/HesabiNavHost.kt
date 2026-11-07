@@ -52,6 +52,7 @@ import com.braveboy.hesabi.ui.accounts.AccountsScreen
 import com.braveboy.hesabi.ui.backup.BackupScreen
 import com.braveboy.hesabi.ui.budget.BudgetScreen
 import com.braveboy.hesabi.ui.categories.CategoriesScreen
+import com.braveboy.hesabi.ui.debts.DebtsAndCommitmentsScreen
 import com.braveboy.hesabi.ui.entry.AddEditScreen
 import com.braveboy.hesabi.ui.home.HomeScreen
 import com.braveboy.hesabi.ui.more.MoreScreen
@@ -74,6 +75,7 @@ object Routes {
     const val SMS = "sms"
     const val BACKUP = "backup"
     const val SETTINGS = "settings"
+    const val DEBTS = "debts"
     const val ENTRY = "entry?editId={editId}&type={type}"
 
     fun newEntry(type: TransactionType): String = "entry?type=${type.name}"
@@ -184,6 +186,7 @@ private fun MainScaffold(
                         onAccounts = { navController.navigate(Routes.ACCOUNTS) },
                         onCategories = { navController.navigate(Routes.CATEGORIES) },
                         onBudget = { navController.navigate(Routes.BUDGET) },
+                        onDebts = { navController.navigate(Routes.DEBTS) },
                         onSms = { navController.navigate(Routes.SMS) },
                         onBackup = { navController.navigate(Routes.BACKUP) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
@@ -236,6 +239,9 @@ private fun MainScaffold(
                 }
                 composable(Routes.SETTINGS) {
                     SettingsScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.DEBTS) {
+                    DebtsAndCommitmentsScreen(container = container, onBack = { navController.popBackStack() })
                 }
             }
         }

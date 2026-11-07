@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Payment
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Sms
@@ -48,6 +49,7 @@ fun MoreScreen(
     onAccounts: () -> Unit,
     onCategories: () -> Unit,
     onBudget: () -> Unit,
+    onDebts: () -> Unit,
     onSms: () -> Unit,
     onBackup: () -> Unit,
     onSettings: () -> Unit,
@@ -59,6 +61,7 @@ fun MoreScreen(
         onAccounts = onAccounts,
         onCategories = onCategories,
         onBudget = onBudget,
+        onDebts = onDebts,
         onSms = onSms,
         onBackup = onBackup,
         onSettings = onSettings,
@@ -84,6 +87,7 @@ fun MoreContent(
     onAccounts: () -> Unit,
     onCategories: () -> Unit,
     onBudget: () -> Unit,
+    onDebts: () -> Unit,
     onSms: () -> Unit,
     onBackup: () -> Unit,
     onSettings: () -> Unit,
@@ -126,6 +130,13 @@ fun MoreContent(
                 subtitle = "سقف ماهانه و بودجهٔ هر دسته",
                 icon = Icons.Rounded.Savings,
                 onClick = onBudget,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "تعهدات، چک‌ها و وام‌ها",
+                subtitle = "بدهی و طلب، چک‌های صیادی و اقساط",
+                icon = Icons.Rounded.Payment,
+                onClick = onDebts,
             )
         }
         MenuCard {
@@ -210,6 +221,7 @@ private fun MorePreview() {
                     onAccounts = {},
                     onCategories = {},
                     onBudget = {},
+                    onDebts = {},
                     onSms = {},
                     onBackup = {},
                     onSettings = {},
@@ -231,7 +243,7 @@ private fun MoreDarkPreview() {
     HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.DARK) {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                MoreContent(0, {}, {}, {}, {}, {}, {}, {})
+                MoreContent(0, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }

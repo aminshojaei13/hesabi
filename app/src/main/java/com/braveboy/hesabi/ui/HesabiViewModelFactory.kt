@@ -91,6 +91,13 @@ class HesabiViewModelFactory(
                 categoryRepository = container.categoryRepository,
                 settingsRepository = container.settingsRepository,
             )
+            modelClass.isAssignableFrom(com.braveboy.hesabi.ui.debts.DebtsAndCommitmentsViewModel::class.java) -> com.braveboy.hesabi.ui.debts.DebtsAndCommitmentsViewModel(
+                personRepository = container.personRepository,
+                debtRepository = container.debtRepository,
+                chequeRepository = container.chequeRepository,
+                loanRepository = container.loanRepository,
+                settingsRepository = container.settingsRepository,
+            )
             else -> error("ViewModel not registered: ${modelClass.name}")
         }
         return viewModel as T
