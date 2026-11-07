@@ -46,6 +46,7 @@ enum class TransactionSource {
     SMS,
     IMPORT,
     QUICK_REPEAT,
+    VOICE,
 }
 
 data class Transaction(
@@ -116,6 +117,24 @@ data class MonthReport(
 
     val isOverBudget: Boolean
         get() = budgetLimitToman != null && budgetSpentToman > budgetLimitToman!!
+}
+
+data class SavingsGoal(
+    val id: String,
+    val title: String,
+    val targetAmountToman: Long,
+    val savedAmountToman: Long = 0L,
+    val colorArgb: Long = 0xFF10B981,
+    val iconKey: String = "savings",
+    val targetDateEpochDay: Long? = null,
+    val isCompleted: Boolean = false,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+) {
+    val progress: Float
+        get() = if (targetAmountToman > 0) (savedAmountToman.toFloat() / targetAmountToman).coerceIn(0f, 1f) else 0f
+
+    val remainingToman: Long
+        get() = (targetAmountToman - savedAmountToman).coerceAtLeast(0L)
 }
 
 /** A single parsed bank SMS waiting for the user's approval. */

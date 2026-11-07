@@ -40,33 +40,33 @@ val LightScheme = lightColorScheme(
 )
 
 val DarkScheme = darkColorScheme(
-    primary = Color(0xFF4FD8E4),
-    onPrimary = Color(0xFF06282C),
-    primaryContainer = Color(0xFF12383D),
-    onPrimaryContainer = Color(0xFFB6F0F5),
-    secondary = Color(0xFFB1CCCE),
-    onSecondary = Color(0xFF1B3436),
-    secondaryContainer = Color(0xFF334B4D),
-    onSecondaryContainer = Color(0xFFCCE8EA),
-    tertiary = Color(0xFFB7C6EA),
-    onTertiary = Color(0xFF21304E),
-    tertiaryContainer = Color(0xFF374766),
-    onTertiaryContainer = Color(0xFFD7E2FF),
-    background = Color(0xFF0D1315),
-    onBackground = Color(0xFFE7EEF0),
-    surface = Color(0xFF161F21),
-    onSurface = Color(0xFFE7EEF0),
-    surfaceVariant = Color(0xFF223033),
-    onSurfaceVariant = Color(0xFFBEC8CB),
-    outline = Color(0xFF2A3A3E),
-    outlineVariant = Color(0xFF1E2B2E),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
-    inverseSurface = Color(0xFFE7EEF0),
-    inverseOnSurface = Color(0xFF111A1C),
-    inversePrimary = Color(0xFF0C7F8B),
+    primary = Color(0xFF10B981),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFF34D399),
+    secondary = Color(0xFF8B5CF6),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFF4C1D95),
+    onSecondaryContainer = Color(0xFFC4B5FD),
+    tertiary = Color(0xFF3B82F6),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFF1E3A5F),
+    onTertiaryContainer = Color(0xFF93C5FD),
+    background = Color(0xFF0B0E17),
+    onBackground = Color(0xFFF1F5F9),
+    surface = Color(0xFF111827),
+    onSurface = Color(0xFFF1F5F9),
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0xFF1E3A5F),
+    outlineVariant = Color(0xFF0F2137),
+    error = Color(0xFFEF4444),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFF7F1D1D),
+    onErrorContainer = Color(0xFFFCA5A5),
+    inverseSurface = Color(0xFFF1F5F9),
+    inverseOnSurface = Color(0xFF0B0E17),
+    inversePrimary = Color(0xFF059669),
     scrim = Color(0xCC000000),
 )
 
@@ -94,10 +94,38 @@ val LightSemantic = HesabiSemanticColors(
 )
 
 val DarkSemantic = HesabiSemanticColors(
-    expense = Color(0xFFFF8A9B),
-    income = Color(0xFF6FE0B0),
-    transfer = Color(0xFFA9B8BD),
-    warning = Color(0xFFF0C36A),
-    success = Color(0xFF6FE0B0),
-    muted = Color(0xFF93A1A5),
+    expense = Color(0xFFFB7185),
+    income = Color(0xFF34D399),
+    transfer = Color(0xFF94A3B8),
+    warning = Color(0xFFFBBF24),
+    success = Color(0xFF34D399),
+    muted = Color(0xFF64748B),
+)
+
+/**
+ * Extended palette for Lumina glassmorphic components. Not part of M3
+ * ColorScheme but accessible via LocalHesabiLumina composition local.
+ */
+@Immutable
+data class HesabiLuminaColors(
+    val glassBorder: Color = Color(0x33FFFFFF),
+    val glassBackground: Color = Color(0x1AFFFFFF),
+    val glowPrimary: Color = Color(0x3310B981),
+    val glowSecondary: Color = Color(0x338B5CF6),
+    val voiceWaveform: Color = Color(0xFF10B981),
+    val voiceWaveformSecondary: Color = Color(0xFF06B6D4),
+    val safeBudgetGreen: Color = Color(0xFF10B981),
+    val cautionBudgetYellow: Color = Color(0xFFFBBF24),
+    val dangerBudgetRed: Color = Color(0xFFEF4444),
+    val cardMeshGradientStart: Color = Color(0xFF10B981),
+    val cardMeshGradientMid: Color = Color(0xFF8B5CF6),
+    val cardMeshGradientEnd: Color = Color(0xFF3B82F6),
+)
+
+val DarkLuminaColors = HesabiLuminaColors()
+val LightLuminaColors = HesabiLuminaColors(
+    glassBorder = Color(0x1A000000),
+    glassBackground = Color(0x0D000000),
+    glowPrimary = Color(0x1A10B981),
+    glowSecondary = Color(0x1A8B5CF6),
 )

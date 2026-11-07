@@ -1,5 +1,6 @@
 package com.braveboy.hesabi.ui.theme
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -8,10 +9,13 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.view.WindowCompat
 import com.braveboy.hesabi.core.money.Currency
 import com.braveboy.hesabi.domain.model.ThemeMode
 
@@ -23,6 +27,7 @@ data class HesabiDisplayPreferences(
 
 val LocalHesabiSemantic = staticCompositionLocalOf { LightSemantic }
 val LocalHesabiDisplay = staticCompositionLocalOf { HesabiDisplayPreferences() }
+val LocalHesabiLumina = staticCompositionLocalOf { LightLuminaColors }
 
 @Composable
 fun HesabiTheme(
@@ -38,18 +43,33 @@ fun HesabiTheme(
         ThemeMode.DARK -> true
     }
     val context = LocalContext.current
+    val view = LocalView.current
+
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !dark
+                controller.isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
+
     val colorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
         if (dark) DarkScheme else LightScheme
     }
     val semantic = if (dark) DarkSemantic else LightSemantic
+    val lumina = if (dark) DarkLuminaColors else LightLuminaColors
 
     // The product is Persian-first: the layout is always RTL, even on a device
     // whose system locale is English, so mirrored rows and chevrons stay correct.
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Rtl,
         LocalHesabiSemantic provides semantic,
+        LocalHesabiLumina provides lumina,
         LocalHesabiDisplay provides HesabiDisplayPreferences(currency = currency, hideAmounts = hideAmounts),
     ) {
         MaterialTheme(
