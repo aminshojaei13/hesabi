@@ -2,15 +2,23 @@ package com.braveboy.hesabi.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.date.MonthPeriod
+import com.braveboy.hesabi.domain.logic.DailySafeToSpend
+import com.braveboy.hesabi.domain.logic.PaydayCycle
+import com.braveboy.hesabi.domain.logic.PaydayCycleCalculator
 import com.braveboy.hesabi.domain.logic.ReportCalculator
 import com.braveboy.hesabi.domain.model.AccountWithBalance
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.MonthReport
+import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.Transaction
+import com.braveboy.hesabi.domain.model.TransactionType
 import com.braveboy.hesabi.domain.repository.AccountRepository
 import com.braveboy.hesabi.domain.repository.BudgetRepository
 import com.braveboy.hesabi.domain.repository.CategoryRepository
+import com.braveboy.hesabi.domain.repository.SavingsGoalRepository
+import com.braveboy.hesabi.domain.repository.SettingsRepository
 import com.braveboy.hesabi.domain.repository.SmsRepository
 import com.braveboy.hesabi.domain.repository.TransactionRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val period: MonthPeriod = MonthPeriod.current(),
@@ -27,6 +36,9 @@ data class HomeUiState(
     val recent: List<Transaction> = emptyList(),
     val categories: Map<String, Category> = emptyMap(),
     val balances: List<AccountWithBalance> = emptyList(),
+    val savingsGoals: List<SavingsGoal> = emptyList(),
+    val safeToSpend: DailySafeToSpend? = null,
+    val paydayCycle: PaydayCycle? = null,
     val pendingSmsCount: Int = 0,
     val loading: Boolean = true,
 ) {
@@ -40,6 +52,8 @@ class HomeViewModel(
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
     smsRepository: SmsRepository,
+    private val savingsGoalRepository: SavingsGoalRepository,
+    settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val period = MutableStateFlow(MonthPeriod.current())
@@ -49,15 +63,23 @@ class HomeViewModel(
         val categories: List<Category>,
         val balances: List<AccountWithBalance>,
         val budgets: List<com.braveboy.hesabi.domain.model.Budget>,
+        val goals: List<SavingsGoal>,
+        val paydayDay: Int,
     )
 
     private val core = combine(
-        transactionRepository.observeAll(),
-        categoryRepository.observeAll(),
-        accountRepository.observeWithBalances(),
-        period.flatMapLatest { budgetRepository.observeForPeriod(it.key) },
-    ) { transactions, categories, balances, budgets ->
-        Core(transactions, categories, balances, budgets)
+        combine(
+            transactionRepository.observeAll(),
+            categoryRepository.observeAll(),
+            accountRepository.observeWithBalances(),
+            period.flatMapLatest { budgetRepository.observeForPeriod(it.key) },
+            savingsGoalRepository.observeActive(),
+        ) { transactions, categories, balances, budgets, goals ->
+            Core(transactions, categories, balances, budgets, goals, paydayDay = 1)
+        },
+        settingsRepository.settings,
+    ) { coreData, settings ->
+        coreData.copy(paydayDay = settings.paydayDayOfMonth)
     }
 
     val state: StateFlow<HomeUiState> = combine(
@@ -73,6 +95,31 @@ class HomeViewModel(
             previousTransactions = data.transactions.filter { previous.contains(it.occurredOnEpochDay) },
             budgets = data.budgets,
         )
+
+        val today = JalaliDate.today()
+        val todayEpochDay = today.toEpochDay()
+        val cycle = PaydayCycleCalculator.calculateCycle(today = today, paydayDay = data.paydayDay)
+
+        val cycleExpenses = data.transactions
+            .filter { it.type == TransactionType.EXPENSE && it.occurredOnEpochDay >= cycle.startEpochDay && it.occurredOnEpochDay < cycle.endEpochDayExclusive }
+            .sumOf { it.amountToman }
+
+        val spentToday = data.transactions
+            .filter { it.type == TransactionType.EXPENSE && it.occurredOnEpochDay == todayEpochDay }
+            .sumOf { it.amountToman }
+
+        val totalBalance = data.balances.sumOf { it.balanceToman }
+        val goalsAllocated = data.goals.sumOf { it.savedAmountToman }
+
+        val safeToSpend = PaydayCycleCalculator.calculateSafeToSpend(
+            totalLiquidBalanceToman = totalBalance,
+            totalCycleExpenseToman = cycleExpenses,
+            spentTodayToman = spentToday,
+            cycle = cycle,
+            monthlyBudgetLimitToman = report.budgetLimitToman,
+            savingsGoalsAllocatedToman = goalsAllocated,
+        )
+
         HomeUiState(
             period = current,
             report = report,
@@ -81,6 +128,9 @@ class HomeViewModel(
                 .take(6),
             categories = data.categories.associateBy { it.id },
             balances = data.balances,
+            savingsGoals = data.goals,
+            safeToSpend = safeToSpend,
+            paydayCycle = cycle,
             pendingSmsCount = pendingSms,
             loading = false,
         )
@@ -96,5 +146,29 @@ class HomeViewModel(
 
     fun goToCurrentMonth() {
         period.value = MonthPeriod.current()
+    }
+
+    fun saveGoal(goal: SavingsGoal) {
+        viewModelScope.launch {
+            savingsGoalRepository.save(goal)
+        }
+    }
+
+    fun deleteGoal(id: String) {
+        viewModelScope.launch {
+            savingsGoalRepository.delete(id)
+        }
+    }
+
+    fun depositToGoal(goalId: String, amountToman: Long) {
+        viewModelScope.launch {
+            savingsGoalRepository.deposit(goalId, amountToman)
+        }
+    }
+
+    fun withdrawFromGoal(goalId: String, amountToman: Long) {
+        viewModelScope.launch {
+            savingsGoalRepository.withdraw(goalId, amountToman)
+        }
     }
 }

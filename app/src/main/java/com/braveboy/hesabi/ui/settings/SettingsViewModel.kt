@@ -54,6 +54,8 @@ class SettingsViewModel(
 
     fun setDefaultAccount(id: String?) = launchSetting { settingsRepository.setDefaultAccountId(id) }
 
+    fun setPaydayDayOfMonth(day: Int) = launchSetting { settingsRepository.setPaydayDayOfMonth(day) }
+
     fun completeOnboarding() {
         viewModelScope.launch { settingsRepository.setOnboarded(true) }
     }

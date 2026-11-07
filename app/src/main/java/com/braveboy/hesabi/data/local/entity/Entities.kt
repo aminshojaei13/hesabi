@@ -92,3 +92,19 @@ data class SenderRuleEntity(
     @PrimaryKey val sender: String,
     val ignored: Boolean,
 )
+
+@Entity(
+    tableName = "savings_goals",
+    indices = [Index("isCompleted"), Index("createdAtMillis")],
+)
+data class SavingsGoalEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val targetAmountToman: Long,
+    val savedAmountToman: Long,
+    val colorArgb: Long,
+    val iconKey: String,
+    val targetDateEpochDay: Long?,
+    val isCompleted: Boolean,
+    val createdAtMillis: Long,
+)

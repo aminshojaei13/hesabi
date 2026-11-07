@@ -9,6 +9,7 @@ import androidx.room.Upsert
 import com.braveboy.hesabi.data.local.entity.AccountEntity
 import com.braveboy.hesabi.data.local.entity.BudgetEntity
 import com.braveboy.hesabi.data.local.entity.CategoryEntity
+import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
 import com.braveboy.hesabi.data.local.entity.TransactionEntity
@@ -209,5 +210,32 @@ interface SenderRuleDao {
     suspend fun deleteBySender(sender: String)
 
     @Query("DELETE FROM sender_rules")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface SavingsGoalDao {
+    @Query("SELECT * FROM savings_goals ORDER BY isCompleted ASC, createdAtMillis DESC")
+    fun observeAll(): Flow<List<SavingsGoalEntity>>
+
+    @Query("SELECT * FROM savings_goals WHERE isCompleted = 0 ORDER BY createdAtMillis DESC")
+    fun observeActive(): Flow<List<SavingsGoalEntity>>
+
+    @Query("SELECT * FROM savings_goals ORDER BY isCompleted ASC, createdAtMillis DESC")
+    suspend fun getAll(): List<SavingsGoalEntity>
+
+    @Query("SELECT * FROM savings_goals WHERE id = :id")
+    suspend fun findById(id: String): SavingsGoalEntity?
+
+    @Upsert
+    suspend fun upsert(goal: SavingsGoalEntity)
+
+    @Query("DELETE FROM savings_goals WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("UPDATE savings_goals SET savedAmountToman = :newAmount, isCompleted = :isCompleted WHERE id = :id")
+    suspend fun updateAmount(id: String, newAmount: Long, isCompleted: Boolean)
+
+    @Query("DELETE FROM savings_goals")
     suspend fun deleteAll()
 }
