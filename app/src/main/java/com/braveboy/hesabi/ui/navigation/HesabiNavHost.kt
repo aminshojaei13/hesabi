@@ -1,27 +1,40 @@
 package com.braveboy.hesabi.ui.navigation
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -48,6 +61,7 @@ import com.braveboy.hesabi.ui.settings.SettingsScreen
 import com.braveboy.hesabi.ui.sms.SmsScreen
 import com.braveboy.hesabi.ui.theme.HesabiTheme
 import com.braveboy.hesabi.ui.transactions.TransactionsScreen
+import com.braveboy.hesabi.ui.voice.VoiceEntrySheet
 
 object Routes {
     const val HOME = "home"
@@ -70,7 +84,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val tabs = listOf(
     Tab(Routes.HOME, "خانه", Icons.Rounded.Home),
-    Tab(Routes.TRANSACTIONS, "تراکنش‌ها", Icons.Rounded.ReceiptLong),
+    Tab(Routes.TRANSACTIONS, "تراکنش‌ها", Icons.AutoMirrored.Rounded.ReceiptLong),
     Tab(Routes.REPORTS, "گزارش", Icons.Rounded.BarChart),
     Tab(Routes.MORE, "بیشتر", Icons.Rounded.MoreHoriz),
 )
@@ -108,12 +122,12 @@ private fun MainScaffold(
     onSharedTextConsumed: () -> Unit,
 ) {
     val navController = rememberNavController()
+    var showVoiceSheet by remember { mutableStateOf(false) }
     val pendingSms by container.smsRepository.observePendingCount()
         .collectAsStateWithLifecycle(initialValue = 0)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = tabs.any { it.route == currentRoute }
-    val showFab = currentRoute == Routes.HOME || currentRoute == Routes.TRANSACTIONS
 
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
@@ -125,34 +139,12 @@ private fun MainScaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    tabs.forEach { tab ->
-                        val selected = currentRoute == tab.route
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { navigateTab(navController, tab.route) },
-                            icon = {
-                                if (tab.route == Routes.MORE && pendingSms > 0) {
-                                    BadgedBox(badge = { Badge { Text(pendingSms.toString()) } }) {
-                                        Icon(tab.icon, contentDescription = null)
-                                    }
-                                } else {
-                                    Icon(tab.icon, contentDescription = null)
-                                }
-                            },
-                            label = { Text(tab.label) },
-                        )
-                    }
-                }
-            }
-        },
-        floatingActionButton = {
-            if (showFab) {
-                ExtendedFloatingActionButton(
-                    onClick = { navController.navigate(Routes.newEntry(TransactionType.EXPENSE)) },
-                    icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                    text = { Text("ثبت") },
-                    modifier = Modifier.padding(bottom = 4.dp),
+                HesabiFloatingNavigationBar(
+                    currentRoute = currentRoute,
+                    pendingSmsCount = pendingSms,
+                    onTabSelected = { route -> navigateTab(navController, route) },
+                    onAddClick = { navController.navigate(Routes.newEntry(TransactionType.EXPENSE)) },
+                    onVoiceClick = { showVoiceSheet = true },
                 )
             }
         },
@@ -171,6 +163,7 @@ private fun MainScaffold(
                         onOpenSms = { navController.navigate(Routes.SMS) },
                         onOpenBudget = { navController.navigate(Routes.BUDGET) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onOpenVoice = { showVoiceSheet = true },
                     )
                 }
                 composable(Routes.TRANSACTIONS) {
@@ -247,6 +240,14 @@ private fun MainScaffold(
             }
         }
     }
+
+    if (showVoiceSheet) {
+        VoiceEntrySheet(
+            container = container,
+            onDismiss = { showVoiceSheet = false },
+            onSaved = { showVoiceSheet = false },
+        )
+    }
 }
 
 private fun navigateTab(navController: NavHostController, route: String) {
@@ -256,5 +257,158 @@ private fun navigateTab(navController: NavHostController, route: String) {
         }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+@Composable
+private fun HesabiFloatingNavigationBar(
+    currentRoute: String?,
+    pendingSmsCount: Int,
+    onTabSelected: (String) -> Unit,
+    onAddClick: () -> Unit,
+    onVoiceClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .shadow(12.dp, RoundedCornerShape(32.dp)),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Home Tab
+            HesabiNavItem(
+                label = "خانه",
+                icon = Icons.Rounded.Home,
+                selected = currentRoute == Routes.HOME,
+                onClick = { onTabSelected(Routes.HOME) },
+            )
+
+            // Transactions Tab
+            HesabiNavItem(
+                label = "تراکنش‌ها",
+                icon = Icons.AutoMirrored.Rounded.ReceiptLong,
+                selected = currentRoute == Routes.TRANSACTIONS,
+                onClick = { onTabSelected(Routes.TRANSACTIONS) },
+            )
+
+            // Center Floating Mic & Add Actions
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    onClick = onVoiceClick,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondary,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.size(42.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Mic,
+                            contentDescription = "ثبت صوتی",
+                            tint = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onAddClick,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.size(46.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = "ثبت دستی",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
+            }
+
+            // Reports Tab
+            HesabiNavItem(
+                label = "گزارش",
+                icon = Icons.Rounded.BarChart,
+                selected = currentRoute == Routes.REPORTS,
+                onClick = { onTabSelected(Routes.REPORTS) },
+            )
+
+            // More Tab
+            HesabiNavItem(
+                label = "بیشتر",
+                icon = Icons.Rounded.MoreHoriz,
+                selected = currentRoute == Routes.MORE,
+                badgeCount = pendingSmsCount,
+                onClick = { onTabSelected(Routes.MORE) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HesabiNavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badgeCount: Int = 0,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (badgeCount > 0 && !selected) {
+                BadgedBox(badge = { Badge { Text(badgeCount.toString()) } }) {
+                    Icon(
+                        icon,
+                        contentDescription = label,
+                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (selected) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }

@@ -19,8 +19,11 @@ object HesabiRadius {
     val chip = 999.dp
     val input = 12.dp
     val card = 16.dp
+    val glassCard = 20.dp
     val sheet = 28.dp
     val hero = 24.dp
+    val dock = 32.dp
+    val glow = 40.dp
 }
 
 val HesabiShapes = Shapes(

@@ -2,6 +2,7 @@ package com.braveboy.hesabi.ui.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,11 +14,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +31,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,15 +45,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.date.MonthPeriod
+import com.braveboy.hesabi.core.money.Digits
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.domain.logic.ReportCalculator
 import com.braveboy.hesabi.domain.model.CategoryKind
+import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.TransactionType
+import com.braveboy.hesabi.ui.components.AddEditGoalDialog
 import com.braveboy.hesabi.ui.components.BalanceHero
 import com.braveboy.hesabi.ui.components.BudgetProgressCard
+import com.braveboy.hesabi.ui.components.DailySafeToSpendWidget
 import com.braveboy.hesabi.ui.components.EmptyState
+import com.braveboy.hesabi.ui.components.GoalDepositWithdrawDialog
 import com.braveboy.hesabi.ui.components.MonthSwitcher
 import com.braveboy.hesabi.ui.components.PendingSmsBanner
+import com.braveboy.hesabi.ui.components.SavingsGoalsSection
 import com.braveboy.hesabi.ui.components.SectionHeader
 import com.braveboy.hesabi.ui.components.TransactionRow
 import com.braveboy.hesabi.ui.hesabiViewModel
@@ -63,10 +77,16 @@ fun HomeScreen(
     onOpenSms: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenVoice: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: HomeViewModel = hesabiViewModel(container)
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    var activeGoalForDeposit by remember { mutableStateOf<SavingsGoal?>(null) }
+    var activeGoalForEdit by remember { mutableStateOf<SavingsGoal?>(null) }
+    var showCreateGoalDialog by remember { mutableStateOf(false) }
+
     HomeContent(
         state = state,
         onPreviousMonth = viewModel::previousMonth,
@@ -78,8 +98,40 @@ fun HomeScreen(
         onOpenSms = onOpenSms,
         onOpenBudget = onOpenBudget,
         onOpenSettings = onOpenSettings,
+        onOpenVoice = onOpenVoice,
+        onAddGoal = { showCreateGoalDialog = true },
+        onGoalClick = { goal -> activeGoalForDeposit = goal },
         modifier = modifier,
     )
+
+    if (activeGoalForDeposit != null) {
+        GoalDepositWithdrawDialog(
+            goal = activeGoalForDeposit!!,
+            onDeposit = { amount -> viewModel.depositToGoal(activeGoalForDeposit!!.id, amount) },
+            onWithdraw = { amount -> viewModel.withdrawFromGoal(activeGoalForDeposit!!.id, amount) },
+            onEdit = {
+                activeGoalForEdit = activeGoalForDeposit
+            },
+            onDismiss = { activeGoalForDeposit = null },
+        )
+    }
+
+    if (activeGoalForEdit != null) {
+        AddEditGoalDialog(
+            goal = activeGoalForEdit,
+            onSave = { updated -> viewModel.saveGoal(updated) },
+            onDelete = { id -> viewModel.deleteGoal(id) },
+            onDismiss = { activeGoalForEdit = null },
+        )
+    }
+
+    if (showCreateGoalDialog) {
+        AddEditGoalDialog(
+            goal = null,
+            onSave = { newGoal -> viewModel.saveGoal(newGoal) },
+            onDismiss = { showCreateGoalDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -94,6 +146,9 @@ fun HomeContent(
     onOpenSms: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenVoice: () -> Unit = {},
+    onAddGoal: () -> Unit = {},
+    onGoalClick: (SavingsGoal) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val report = state.report
@@ -109,24 +164,101 @@ fun HomeContent(
     ) {
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = HesabiSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
-                    Text(
-                        text = "حسابی",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = JalaliDate.today().formatLong(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "👋",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "سلام، خوش‌آمدید",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "حسابی",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Rounded.Settings, contentDescription = "تنظیمات")
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.xs),
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.height(38.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = JalaliDate.today().let { Digits.toPersian("${it.day} ${it.monthName()}") },
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+
+                    if (state.pendingSmsCount > 0) {
+                        Surface(
+                            onClick = onOpenSms,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(38.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                BadgedBox(
+                                    badge = { Badge { Text(state.pendingSmsCount.toString()) } }
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Notifications,
+                                        contentDescription = "پیامک‌ها",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Surface(
+                        onClick = onOpenSettings,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(38.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Rounded.Settings,
+                                contentDescription = "تنظیمات",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -148,6 +280,13 @@ fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
+                QuickAction(
+                    label = "ثبت صوتی",
+                    icon = Icons.Rounded.Mic,
+                    color = MaterialTheme.colorScheme.secondary,
+                    onClick = onOpenVoice,
+                    modifier = Modifier.weight(1f),
+                )
                 QuickAction(
                     label = "هزینه",
                     icon = Icons.Rounded.TrendingDown,
@@ -171,10 +310,25 @@ fun HomeContent(
                 )
             }
         }
+        if (state.safeToSpend != null) {
+            item {
+                DailySafeToSpendWidget(
+                    safeToSpend = state.safeToSpend,
+                    onClick = onOpenBudget,
+                )
+            }
+        }
         if (state.pendingSmsCount > 0) {
             item {
                 PendingSmsBanner(count = state.pendingSmsCount, onClick = onOpenSms)
             }
+        }
+        item {
+            SavingsGoalsSection(
+                goals = state.savingsGoals,
+                onAddGoal = onAddGoal,
+                onGoalClick = onGoalClick,
+            )
         }
         if (report != null) {
             item {

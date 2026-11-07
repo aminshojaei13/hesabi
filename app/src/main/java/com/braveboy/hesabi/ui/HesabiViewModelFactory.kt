@@ -36,6 +36,8 @@ class HesabiViewModelFactory(
                 accountRepository = container.accountRepository,
                 budgetRepository = container.budgetRepository,
                 smsRepository = container.smsRepository,
+                savingsGoalRepository = container.savingsGoalRepository,
+                settingsRepository = container.settingsRepository,
             )
             modelClass.isAssignableFrom(AddEditViewModel::class.java) -> AddEditViewModel(
                 transactionId = transactionId,
@@ -81,6 +83,12 @@ class HesabiViewModelFactory(
             )
             modelClass.isAssignableFrom(BackupViewModel::class.java) -> BackupViewModel(
                 backupRepository = container.backupRepository,
+                settingsRepository = container.settingsRepository,
+            )
+            modelClass.isAssignableFrom(com.braveboy.hesabi.ui.voice.VoiceEntryViewModel::class.java) -> com.braveboy.hesabi.ui.voice.VoiceEntryViewModel(
+                transactionRepository = container.transactionRepository,
+                accountRepository = container.accountRepository,
+                categoryRepository = container.categoryRepository,
                 settingsRepository = container.settingsRepository,
             )
             else -> error("ViewModel not registered: ${modelClass.name}")
