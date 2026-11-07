@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -126,6 +127,15 @@ fun TransactionRow(
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                         )
                     }
+                }
+                if (!transaction.receiptImagePath.isNullOrBlank()) {
+                    Spacer(Modifier.width(HesabiSpacing.xs))
+                    Icon(
+                        imageVector = Icons.Rounded.AttachFile,
+                        contentDescription = "دارای تصویر فاکتور",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
             }
             Text(

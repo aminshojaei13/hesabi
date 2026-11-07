@@ -52,11 +52,13 @@ import com.braveboy.hesabi.ui.accounts.AccountsScreen
 import com.braveboy.hesabi.ui.backup.BackupScreen
 import com.braveboy.hesabi.ui.budget.BudgetScreen
 import com.braveboy.hesabi.ui.categories.CategoriesScreen
+import com.braveboy.hesabi.ui.debts.DebtsAndCommitmentsScreen
 import com.braveboy.hesabi.ui.entry.AddEditScreen
 import com.braveboy.hesabi.ui.home.HomeScreen
 import com.braveboy.hesabi.ui.more.MoreScreen
 import com.braveboy.hesabi.ui.onboarding.OnboardingScreen
 import com.braveboy.hesabi.ui.reports.ReportsScreen
+import com.braveboy.hesabi.ui.security.AppLockScreen
 import com.braveboy.hesabi.ui.settings.SettingsScreen
 import com.braveboy.hesabi.ui.sms.SmsScreen
 import com.braveboy.hesabi.ui.theme.HesabiTheme
@@ -74,6 +76,7 @@ object Routes {
     const val SMS = "sms"
     const val BACKUP = "backup"
     const val SETTINGS = "settings"
+    const val DEBTS = "debts"
     const val ENTRY = "entry?editId={editId}&type={type}"
 
     fun newEntry(type: TransactionType): String = "entry?type=${type.name}"
@@ -97,13 +100,23 @@ fun HesabiRoot(
     onSharedTextConsumed: () -> Unit,
 ) {
     val settings by container.settingsRepository.settings.collectAsStateWithLifecycle(initialValue = initialSettings)
+    var isAppLocked by remember(settings.appLockEnabled) {
+        mutableStateOf(settings.appLockEnabled && settings.pinCodeHash.isNotBlank())
+    }
+
     HesabiTheme(
         themeMode = settings.themeMode,
         dynamicColor = settings.dynamicColor,
         currency = settings.currency,
         hideAmounts = settings.hideAmounts,
     ) {
-        if (!settings.onboarded) {
+        if (isAppLocked) {
+            AppLockScreen(
+                pinCodeHash = settings.pinCodeHash,
+                biometricEnabled = settings.biometricEnabled,
+                onUnlocked = { isAppLocked = false },
+            )
+        } else if (!settings.onboarded) {
             OnboardingScreen(container = container)
         } else {
             MainScaffold(
@@ -184,6 +197,7 @@ private fun MainScaffold(
                         onAccounts = { navController.navigate(Routes.ACCOUNTS) },
                         onCategories = { navController.navigate(Routes.CATEGORIES) },
                         onBudget = { navController.navigate(Routes.BUDGET) },
+                        onDebts = { navController.navigate(Routes.DEBTS) },
                         onSms = { navController.navigate(Routes.SMS) },
                         onBackup = { navController.navigate(Routes.BACKUP) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
@@ -236,6 +250,9 @@ private fun MainScaffold(
                 }
                 composable(Routes.SETTINGS) {
                     SettingsScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.DEBTS) {
+                    DebtsAndCommitmentsScreen(container = container, onBack = { navController.popBackStack() })
                 }
             }
         }

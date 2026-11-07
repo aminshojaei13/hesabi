@@ -61,6 +61,7 @@ data class Transaction(
     val note: String = "",
     val source: TransactionSource = TransactionSource.MANUAL,
     val externalRef: String? = null,
+    val receiptImagePath: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = createdAtMillis,
 ) {
@@ -116,7 +117,7 @@ data class MonthReport(
         get() = budgetLimitToman?.takeIf { it > 0 }?.let { (budgetSpentToman.toFloat() / it).coerceAtLeast(0f) }
 
     val isOverBudget: Boolean
-        get() = budgetLimitToman != null && budgetSpentToman > budgetLimitToman!!
+        get() = budgetLimitToman != null && budgetSpentToman > budgetLimitToman
 }
 
 data class SavingsGoal(
@@ -175,6 +176,7 @@ data class TransactionDraft(
     val occurredOnEpochDay: Long = JalaliDate.today().toEpochDay(),
     val note: String = "",
     val source: TransactionSource = TransactionSource.MANUAL,
+    val receiptImagePath: String? = null,
 ) {
     fun validate(): List<String> = buildList {
         if (amountToman <= 0) add("مبلغ باید بیشتر از صفر باشد.")
@@ -186,4 +188,100 @@ data class TransactionDraft(
             add("یک دسته انتخاب کنید.")
         }
     }
+}
+
+data class Person(
+    val id: String,
+    val name: String,
+    val phoneNumber: String = "",
+    val notes: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+enum class DebtDirection(val labelFa: String) {
+    LENT("طلبکارم"),
+    BORROWED("بدهکارم"),
+}
+
+data class Debt(
+    val id: String,
+    val personId: String,
+    val amountToman: Long,
+    val settledAmountToman: Long = 0L,
+    val direction: DebtDirection,
+    val dueEpochDay: Long? = null,
+    val note: String = "",
+    val isSettled: Boolean = false,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+) {
+    val remainingAmountToman: Long get() = (amountToman - settledAmountToman).coerceAtLeast(0L)
+}
+
+data class PersonWithDebts(
+    val person: Person,
+    val debts: List<Debt>,
+) {
+    val netBalanceToman: Long
+        get() = debts.filter { !it.isSettled }.sumOf {
+            if (it.direction == DebtDirection.LENT) it.remainingAmountToman else -it.remainingAmountToman
+        }
+}
+
+enum class ChequeDirection(val labelFa: String) {
+    RECEIVED("دریافتی"),
+    ISSUED("صادره"),
+}
+
+enum class ChequeStatus(val labelFa: String) {
+    PENDING("در جریان"),
+    CLEARED("وصول شده"),
+    BOUNCED("برگشت خورده"),
+}
+
+data class Cheque(
+    val id: String,
+    val sayadNumber: String = "",
+    val bankName: String,
+    val amountToman: Long,
+    val dueEpochDay: Long,
+    val payeeOrDrawerName: String,
+    val direction: ChequeDirection,
+    val status: ChequeStatus = ChequeStatus.PENDING,
+    val note: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+data class Loan(
+    val id: String,
+    val title: String,
+    val totalAmountToman: Long,
+    val installmentCount: Int,
+    val installmentAmountToman: Long,
+    val accountId: String? = null,
+    val firstDueEpochDay: Long,
+    val note: String = "",
+    val isCompleted: Boolean = false,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+data class Installment(
+    val id: String,
+    val loanId: String,
+    val installmentNumber: Int,
+    val amountToman: Long,
+    val dueEpochDay: Long,
+    val isPaid: Boolean = false,
+    val paidAtEpochDay: Long? = null,
+)
+
+data class LoanWithInstallments(
+    val loan: Loan,
+    val installments: List<Installment>,
+) {
+    val paidCount: Int get() = installments.count { it.isPaid }
+    val remainingCount: Int get() = installments.size - paidCount
+    val paidAmountToman: Long get() = installments.filter { it.isPaid }.sumOf { it.amountToman }
+    val remainingAmountToman: Long get() = (loan.totalAmountToman - paidAmountToman).coerceAtLeast(0L)
+    val nextPendingInstallment: Installment?
+        get() = installments.filter { !it.isPaid }.minByOrNull { it.dueEpochDay }
 }

@@ -56,6 +56,17 @@ class SettingsViewModel(
 
     fun setPaydayDayOfMonth(day: Int) = launchSetting { settingsRepository.setPaydayDayOfMonth(day) }
 
+    fun setAppLockEnabled(enabled: Boolean) = launchSetting { settingsRepository.setAppLockEnabled(enabled) }
+
+    fun setPinCodeHash(hash: String) = launchSetting {
+        settingsRepository.setPinCodeHash(hash)
+        settingsRepository.setAppLockEnabled(hash.isNotBlank())
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) = launchSetting { settingsRepository.setBiometricEnabled(enabled) }
+
+    fun setRemindersEnabled(enabled: Boolean) = launchSetting { settingsRepository.setRemindersEnabled(enabled) }
+
     fun completeOnboarding() {
         viewModelScope.launch { settingsRepository.setOnboarded(true) }
     }

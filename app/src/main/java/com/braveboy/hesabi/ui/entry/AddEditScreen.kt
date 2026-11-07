@@ -1,35 +1,58 @@
 package com.braveboy.hesabi.ui.entry
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.date.JalaliDate
+import com.braveboy.hesabi.core.receipt.ReceiptStorageManager
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.domain.model.CategoryKind
 import com.braveboy.hesabi.domain.model.Transaction
@@ -48,11 +71,15 @@ import com.braveboy.hesabi.ui.components.HesabiTextField
 import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.JalaliDatePickerDialog
+import com.braveboy.hesabi.ui.receipt.ReceiptImageViewerDialog
+import com.braveboy.hesabi.ui.theme.HesabiRadius
+import com.braveboy.hesabi.ui.theme.HesabiSpacing
+import kotlinx.coroutines.launch
 import com.braveboy.hesabi.ui.components.TransactionTypeToggle
 import com.braveboy.hesabi.ui.hesabiViewModel
 import com.braveboy.hesabi.ui.preview.PreviewData
-import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.HesabiTheme
+import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun AddEditScreen(
@@ -86,6 +113,7 @@ fun AddEditScreen(
         onCategory = viewModel::setCategory,
         onDate = viewModel::setDate,
         onNote = viewModel::setNote,
+        onReceiptImageChange = viewModel::setReceiptImagePath,
         onSave = { viewModel.save() },
         onConfirmDuplicate = { viewModel.save(force = true) },
         onDismissDuplicate = viewModel::dismissDuplicate,
@@ -107,6 +135,7 @@ fun AddEditContent(
     onCategory: (com.braveboy.hesabi.domain.model.Category) -> Unit,
     onDate: (JalaliDate) -> Unit,
     onNote: (String) -> Unit,
+    onReceiptImageChange: (String?) -> Unit,
     onSave: () -> Unit,
     onConfirmDuplicate: () -> Unit,
     onDismissDuplicate: () -> Unit,
@@ -115,6 +144,19 @@ fun AddEditContent(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showReceiptViewer by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val path = ReceiptStorageManager.saveReceiptFromUri(context, uri)
+                onReceiptImageChange(path)
+            }
+        }
+    }
     val draft = state.draft
     val activeAccounts = state.accounts.filterNot { it.archived }
     val destinationAccounts = activeAccounts.filterNot { it.id == draft.accountId }
@@ -241,6 +283,83 @@ fun AddEditContent(
                 }
             }
             item {
+                FormSection(title = "تصویر فاکتور / رسید", subtitle = "اختیاری") {
+                    val currentPath = draft.receiptImagePath
+                    if (currentPath.isNullOrBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(HesabiRadius.input),
+                        ) {
+                            Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("الصاق عکس فاکتور یا رسید")
+                        }
+                    } else {
+                        val bitmap = remember(currentPath) { ReceiptStorageManager.loadBitmap(currentPath) }
+                        Surface(
+                            shape = RoundedCornerShape(HesabiRadius.card),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(HesabiSpacing.sm),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
+                                ) {
+                                    if (bitmap != null) {
+                                        Image(
+                                            bitmap = bitmap,
+                                            contentDescription = "پیش‌نمایش رسید",
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { showReceiptViewer = true },
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "فاکتور الصاق شد",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            text = "برای مشاهده کلیک کنید",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+
+                                Row {
+                                    IconButton(onClick = { showReceiptViewer = true }) {
+                                        Icon(Icons.Rounded.Visibility, contentDescription = "مشاهده")
+                                    }
+                                    IconButton(onClick = { onReceiptImageChange(null) }) {
+                                        Icon(
+                                            Icons.Rounded.DeleteOutline,
+                                            contentDescription = "حذف",
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
                 InfoBanner(
                     text = "پس از ذخیره هم می‌توانی همین تراکنش را ویرایش یا حذف کنی.",
                 )
@@ -299,6 +418,17 @@ fun AddEditContent(
             onDismiss = { showDeleteConfirm = false },
         )
     }
+
+    if (showReceiptViewer && !draft.receiptImagePath.isNullOrBlank()) {
+        ReceiptImageViewerDialog(
+            imagePath = draft.receiptImagePath,
+            onDismiss = { showReceiptViewer = false },
+            onDelete = {
+                onReceiptImageChange(null)
+                showReceiptViewer = false
+            },
+        )
+    }
 }
 
 private fun duplicateWarning(duplicate: Transaction): String =
@@ -337,6 +467,7 @@ private fun AddExpensePreview() {
                     onCategory = {},
                     onDate = {},
                     onNote = {},
+                    onReceiptImageChange = {},
                     onSave = {},
                     onConfirmDuplicate = {},
                     onDismissDuplicate = {},
@@ -383,6 +514,7 @@ private fun AddTransferPreview() {
                     onCategory = {},
                     onDate = {},
                     onNote = {},
+                    onReceiptImageChange = {},
                     onSave = {},
                     onConfirmDuplicate = {},
                     onDismissDuplicate = {},

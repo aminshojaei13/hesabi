@@ -9,6 +9,11 @@ import androidx.room.Upsert
 import com.braveboy.hesabi.data.local.entity.AccountEntity
 import com.braveboy.hesabi.data.local.entity.BudgetEntity
 import com.braveboy.hesabi.data.local.entity.CategoryEntity
+import com.braveboy.hesabi.data.local.entity.ChequeEntity
+import com.braveboy.hesabi.data.local.entity.DebtEntity
+import com.braveboy.hesabi.data.local.entity.InstallmentEntity
+import com.braveboy.hesabi.data.local.entity.LoanEntity
+import com.braveboy.hesabi.data.local.entity.PersonEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -237,5 +242,140 @@ interface SavingsGoalDao {
     suspend fun updateAmount(id: String, newAmount: Long, isCompleted: Boolean)
 
     @Query("DELETE FROM savings_goals")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface PersonDao {
+    @Query("SELECT * FROM people ORDER BY name ASC")
+    fun observeAll(): Flow<List<PersonEntity>>
+
+    @Query("SELECT * FROM people ORDER BY name ASC")
+    suspend fun getAll(): List<PersonEntity>
+
+    @Query("SELECT * FROM people WHERE id = :id")
+    suspend fun findById(id: String): PersonEntity?
+
+    @Upsert
+    suspend fun upsert(person: PersonEntity)
+
+    @Query("DELETE FROM people WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM people")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface DebtDao {
+    @Query("SELECT * FROM debts WHERE personId = :personId ORDER BY createdAtMillis DESC")
+    fun observeForPerson(personId: String): Flow<List<DebtEntity>>
+
+    @Query("SELECT * FROM debts WHERE isSettled = 0 ORDER BY dueEpochDay ASC, createdAtMillis DESC")
+    fun observeAllUnsettled(): Flow<List<DebtEntity>>
+
+    @Query("SELECT * FROM debts ORDER BY createdAtMillis DESC")
+    fun observeAll(): Flow<List<DebtEntity>>
+
+    @Query("SELECT * FROM debts WHERE id = :id")
+    suspend fun findById(id: String): DebtEntity?
+
+    @Upsert
+    suspend fun upsert(debt: DebtEntity)
+
+    @Query("UPDATE debts SET settledAmountToman = :settledAmount, isSettled = :isSettled WHERE id = :id")
+    suspend fun updateSettlement(id: String, settledAmount: Long, isSettled: Boolean)
+
+    @Query("DELETE FROM debts WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM debts WHERE personId = :personId")
+    suspend fun deleteByPersonId(personId: String)
+
+    @Query("DELETE FROM debts")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface ChequeDao {
+    @Query("SELECT * FROM cheques ORDER BY dueEpochDay ASC")
+    fun observeAll(): Flow<List<ChequeEntity>>
+
+    @Query("SELECT * FROM cheques WHERE status = 'PENDING' ORDER BY dueEpochDay ASC")
+    fun observePending(): Flow<List<ChequeEntity>>
+
+    @Query("SELECT * FROM cheques ORDER BY dueEpochDay ASC")
+    suspend fun getAll(): List<ChequeEntity>
+
+    @Query("SELECT * FROM cheques WHERE id = :id")
+    suspend fun findById(id: String): ChequeEntity?
+
+    @Upsert
+    suspend fun upsert(cheque: ChequeEntity)
+
+    @Query("UPDATE cheques SET status = :status WHERE id = :id")
+    suspend fun updateStatus(id: String, status: String)
+
+    @Query("DELETE FROM cheques WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM cheques")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface LoanDao {
+    @Query("SELECT * FROM loans ORDER BY isCompleted ASC, createdAtMillis DESC")
+    fun observeAll(): Flow<List<LoanEntity>>
+
+    @Query("SELECT * FROM loans ORDER BY isCompleted ASC, createdAtMillis DESC")
+    suspend fun getAll(): List<LoanEntity>
+
+    @Query("SELECT * FROM loans WHERE id = :id")
+    suspend fun findById(id: String): LoanEntity?
+
+    @Upsert
+    suspend fun upsert(loan: LoanEntity)
+
+    @Query("UPDATE loans SET isCompleted = :isCompleted WHERE id = :id")
+    suspend fun updateCompleted(id: String, isCompleted: Boolean)
+
+    @Query("DELETE FROM loans WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM loans")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface InstallmentDao {
+    @Query("SELECT * FROM installments WHERE loanId = :loanId ORDER BY installmentNumber ASC")
+    fun observeForLoan(loanId: String): Flow<List<InstallmentEntity>>
+
+    @Query("SELECT * FROM installments WHERE loanId = :loanId ORDER BY installmentNumber ASC")
+    suspend fun getForLoan(loanId: String): List<InstallmentEntity>
+
+    @Query("SELECT * FROM installments ORDER BY dueEpochDay ASC")
+    fun observeAll(): Flow<List<InstallmentEntity>>
+
+    @Query("SELECT * FROM installments ORDER BY dueEpochDay ASC")
+    suspend fun getAll(): List<InstallmentEntity>
+
+    @Query("SELECT * FROM installments WHERE id = :id")
+    suspend fun findById(id: String): InstallmentEntity?
+
+    @Upsert
+    suspend fun upsert(installment: InstallmentEntity)
+
+    @Upsert
+    suspend fun upsertAll(installments: List<InstallmentEntity>)
+
+    @Query("UPDATE installments SET isPaid = :isPaid, paidAtEpochDay = :paidAtEpochDay WHERE id = :id")
+    suspend fun updatePaid(id: String, isPaid: Boolean, paidAtEpochDay: Long?)
+
+    @Query("DELETE FROM installments WHERE loanId = :loanId")
+    suspend fun deleteByLoanId(loanId: String)
+
+    @Query("DELETE FROM installments")
     suspend fun deleteAll()
 }

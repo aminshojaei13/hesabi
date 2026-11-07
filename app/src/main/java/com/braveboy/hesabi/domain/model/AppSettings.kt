@@ -19,6 +19,10 @@ data class AppSettings(
     val lastBackupAtMillis: Long? = null,
     val defaultAccountId: String? = null,
     val paydayDayOfMonth: Int = 1,
+    val appLockEnabled: Boolean = false,
+    val pinCodeHash: String = "",
+    val biometricEnabled: Boolean = false,
+    val remindersEnabled: Boolean = true,
 )
 
 data class AccountWithBalance(

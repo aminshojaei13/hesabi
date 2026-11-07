@@ -36,6 +36,10 @@ class SettingsRepositoryImpl(
         val lastBackupAt = longPreferencesKey("last_backup_at")
         val defaultAccountId = stringPreferencesKey("default_account_id")
         val paydayDayOfMonth = intPreferencesKey("payday_day_of_month")
+        val appLockEnabled = booleanPreferencesKey("app_lock_enabled")
+        val pinCodeHash = stringPreferencesKey("pin_code_hash")
+        val biometricEnabled = booleanPreferencesKey("biometric_enabled")
+        val remindersEnabled = booleanPreferencesKey("reminders_enabled")
     }
 
     override val settings: Flow<AppSettings> = context.hesabiSettings.data
@@ -52,6 +56,10 @@ class SettingsRepositoryImpl(
                 lastBackupAtMillis = prefs[Keys.lastBackupAt],
                 defaultAccountId = prefs[Keys.defaultAccountId],
                 paydayDayOfMonth = (prefs[Keys.paydayDayOfMonth] ?: 1).coerceIn(1, 31),
+                appLockEnabled = prefs[Keys.appLockEnabled] ?: false,
+                pinCodeHash = prefs[Keys.pinCodeHash] ?: "",
+                biometricEnabled = prefs[Keys.biometricEnabled] ?: false,
+                remindersEnabled = prefs[Keys.remindersEnabled] ?: true,
             )
         }
 
@@ -79,6 +87,22 @@ class SettingsRepositoryImpl(
 
     override suspend fun setPaydayDayOfMonth(day: Int) = edit {
         it[Keys.paydayDayOfMonth] = day.coerceIn(1, 31)
+    }
+
+    override suspend fun setAppLockEnabled(enabled: Boolean) = edit {
+        it[Keys.appLockEnabled] = enabled
+    }
+
+    override suspend fun setPinCodeHash(hash: String) = edit {
+        it[Keys.pinCodeHash] = hash
+    }
+
+    override suspend fun setBiometricEnabled(enabled: Boolean) = edit {
+        it[Keys.biometricEnabled] = enabled
+    }
+
+    override suspend fun setRemindersEnabled(enabled: Boolean) = edit {
+        it[Keys.remindersEnabled] = enabled
     }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
