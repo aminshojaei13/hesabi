@@ -52,6 +52,7 @@ data class TransactionEntity(
     val note: String,
     val source: String,
     val externalRef: String?,
+    val receiptImagePath: String? = null,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
 )

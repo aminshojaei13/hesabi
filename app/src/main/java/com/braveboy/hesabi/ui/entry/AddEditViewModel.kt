@@ -76,6 +76,7 @@ class AddEditViewModel(
                     occurredOnEpochDay = existing.occurredOnEpochDay,
                     note = existing.note,
                     source = existing.source,
+                    receiptImagePath = existing.receiptImagePath,
                 )
             } else {
                 val type = initialType ?: TransactionType.EXPENSE
@@ -220,11 +221,18 @@ class AddEditViewModel(
                 note = draft.note.trim(),
                 source = snapshot.source,
                 externalRef = snapshot.externalRef,
+                receiptImagePath = draft.receiptImagePath,
                 createdAtMillis = snapshot.createdAtMillis,
                 updatedAtMillis = System.currentTimeMillis(),
             )
             transactionRepository.save(transaction)
             _state.update { it.copy(saving = false, finished = true, duplicateOf = null) }
+        }
+    }
+
+    fun setReceiptImagePath(path: String?) {
+        _state.update { current ->
+            current.copy(draft = current.draft.copy(receiptImagePath = path))
         }
     }
 

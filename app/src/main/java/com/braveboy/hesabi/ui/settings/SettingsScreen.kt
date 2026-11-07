@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material3.AlertDialog
@@ -54,6 +56,7 @@ import com.braveboy.hesabi.ui.components.SectionHeader
 import com.braveboy.hesabi.ui.components.SettingsRow
 import com.braveboy.hesabi.ui.hesabiViewModel
 import com.braveboy.hesabi.ui.preview.PreviewData
+import com.braveboy.hesabi.ui.security.PinSetupDialog
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.HesabiTheme
 
@@ -69,6 +72,7 @@ fun SettingsScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
     var showPaydayPicker by remember { mutableStateOf(false) }
+    var showPinSetup by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
@@ -97,6 +101,10 @@ fun SettingsScreen(
         onAmountsAreRial = viewModel::setAmountsAreRial,
         onPickAccount = { showAccountPicker = true },
         onPickPayday = { showPaydayPicker = true },
+        onSetupPin = { showPinSetup = true },
+        onDisableAppLock = { viewModel.setAppLockEnabled(false) },
+        onBiometricToggle = viewModel::setBiometricEnabled,
+        onRemindersToggle = viewModel::setRemindersEnabled,
         onClearData = { showClearConfirm = true },
         onDismissMessage = viewModel::dismissMessage,
         modifier = modifier,
@@ -205,6 +213,16 @@ fun SettingsScreen(
             onDismiss = { showClearConfirm = false },
         )
     }
+
+    if (showPinSetup) {
+        PinSetupDialog(
+            onDismiss = { showPinSetup = false },
+            onPinConfirmed = { hash ->
+                viewModel.setPinCodeHash(hash)
+                showPinSetup = false
+            },
+        )
+    }
 }
 
 @Composable
@@ -219,6 +237,10 @@ fun SettingsContent(
     onAmountsAreRial: (Boolean) -> Unit,
     onPickAccount: () -> Unit,
     onPickPayday: () -> Unit,
+    onSetupPin: () -> Unit,
+    onDisableAppLock: () -> Unit,
+    onBiometricToggle: (Boolean) -> Unit,
+    onRemindersToggle: (Boolean) -> Unit,
     onClearData: () -> Unit,
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
@@ -325,6 +347,40 @@ fun SettingsContent(
             )
         }
         HesabiCard {
+            SectionHeader("امنیت و قفل برنامه")
+            SwitchRow(
+                title = "قفل برنامه با رمز عبور",
+                subtitle = if (settings.appLockEnabled) "فعال با رمز ۴ رقمی" else "غیرفعال",
+                checked = settings.appLockEnabled,
+                onCheckedChange = { enabled ->
+                    if (enabled) onSetupPin() else onDisableAppLock()
+                },
+            )
+            if (settings.appLockEnabled) {
+                SettingsRow(
+                    title = "تغییر رمز عبور",
+                    subtitle = "تعیین مجدد پین‌کد ۴ رقمی",
+                    icon = Icons.Rounded.Lock,
+                    onClick = onSetupPin,
+                )
+                SwitchRow(
+                    title = "ورود با اثر انگشت / چهره",
+                    subtitle = "احراز هویت بیومتریک دستگاه",
+                    checked = settings.biometricEnabled,
+                    onCheckedChange = onBiometricToggle,
+                )
+            }
+        }
+        HesabiCard {
+            SectionHeader("یادآورها و هشدارها")
+            SwitchRow(
+                title = "یادآور سررسید چک‌ها و اقساط",
+                subtitle = "اعلان محلی ۲ روز قبل از موعد سررسید",
+                checked = settings.remindersEnabled,
+                onCheckedChange = onRemindersToggle,
+            )
+        }
+        HesabiCard {
             SectionHeader("داده‌ها")
             SettingsRow(
                 title = "پاک کردن همهٔ داده‌ها",
@@ -392,7 +448,7 @@ private fun SettingsPreview() {
     HesabiTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                SettingsContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }
@@ -411,6 +467,10 @@ private fun SettingsDarkPreview() {
             Surface(modifier = Modifier.fillMaxSize()) {
                 SettingsContent(
                     SettingsUiState(accounts = PreviewData.accounts),
+                    {},
+                    {},
+                    {},
+                    {},
                     {},
                     {},
                     {},

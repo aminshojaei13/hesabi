@@ -42,7 +42,7 @@ import com.braveboy.hesabi.data.local.entity.TransactionEntity
         LoanEntity::class,
         InstallmentEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class HesabiDatabase : RoomDatabase() {

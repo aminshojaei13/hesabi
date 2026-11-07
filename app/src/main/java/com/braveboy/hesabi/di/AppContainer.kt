@@ -45,7 +45,7 @@ class AppContainer(context: Context) {
         HesabiDatabase::class.java,
         HesabiDatabase.NAME,
     )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         .fallbackToDestructiveMigration(dropAllTables = false)
         .build()
 
@@ -213,5 +213,11 @@ private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_installments_loanId` ON `installments` (`loanId`)")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_installments_dueEpochDay` ON `installments` (`dueEpochDay`)")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_installments_isPaid` ON `installments` (`isPaid`)")
+    }
+}
+
+private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `receiptImagePath` TEXT")
     }
 }

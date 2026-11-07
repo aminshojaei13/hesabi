@@ -58,6 +58,7 @@ import com.braveboy.hesabi.ui.home.HomeScreen
 import com.braveboy.hesabi.ui.more.MoreScreen
 import com.braveboy.hesabi.ui.onboarding.OnboardingScreen
 import com.braveboy.hesabi.ui.reports.ReportsScreen
+import com.braveboy.hesabi.ui.security.AppLockScreen
 import com.braveboy.hesabi.ui.settings.SettingsScreen
 import com.braveboy.hesabi.ui.sms.SmsScreen
 import com.braveboy.hesabi.ui.theme.HesabiTheme
@@ -99,13 +100,23 @@ fun HesabiRoot(
     onSharedTextConsumed: () -> Unit,
 ) {
     val settings by container.settingsRepository.settings.collectAsStateWithLifecycle(initialValue = initialSettings)
+    var isAppLocked by remember(settings.appLockEnabled) {
+        mutableStateOf(settings.appLockEnabled && settings.pinCodeHash.isNotBlank())
+    }
+
     HesabiTheme(
         themeMode = settings.themeMode,
         dynamicColor = settings.dynamicColor,
         currency = settings.currency,
         hideAmounts = settings.hideAmounts,
     ) {
-        if (!settings.onboarded) {
+        if (isAppLocked) {
+            AppLockScreen(
+                pinCodeHash = settings.pinCodeHash,
+                biometricEnabled = settings.biometricEnabled,
+                onUnlocked = { isAppLocked = false },
+            )
+        } else if (!settings.onboarded) {
             OnboardingScreen(container = container)
         } else {
             MainScaffold(

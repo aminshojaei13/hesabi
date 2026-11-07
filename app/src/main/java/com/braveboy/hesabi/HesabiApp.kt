@@ -1,6 +1,7 @@
 package com.braveboy.hesabi
 
 import android.app.Application
+import com.braveboy.hesabi.core.reminder.ReminderScheduler
 import com.braveboy.hesabi.di.AppContainer
 
 class HesabiApp : Application() {
@@ -13,5 +14,6 @@ class HesabiApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        ReminderScheduler.schedule(this)
     }
 }

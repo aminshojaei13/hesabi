@@ -119,6 +119,10 @@ interface SettingsRepository {
     suspend fun setLastBackupAt(millis: Long)
     suspend fun setDefaultAccountId(id: String?)
     suspend fun setPaydayDayOfMonth(day: Int)
+    suspend fun setAppLockEnabled(enabled: Boolean)
+    suspend fun setPinCodeHash(hash: String)
+    suspend fun setBiometricEnabled(enabled: Boolean)
+    suspend fun setRemindersEnabled(enabled: Boolean)
 }
 
 interface PersonRepository {

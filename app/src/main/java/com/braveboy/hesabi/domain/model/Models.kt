@@ -61,6 +61,7 @@ data class Transaction(
     val note: String = "",
     val source: TransactionSource = TransactionSource.MANUAL,
     val externalRef: String? = null,
+    val receiptImagePath: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = createdAtMillis,
 ) {
@@ -175,6 +176,7 @@ data class TransactionDraft(
     val occurredOnEpochDay: Long = JalaliDate.today().toEpochDay(),
     val note: String = "",
     val source: TransactionSource = TransactionSource.MANUAL,
+    val receiptImagePath: String? = null,
 ) {
     fun validate(): List<String> = buildList {
         if (amountToman <= 0) add("مبلغ باید بیشتر از صفر باشد.")

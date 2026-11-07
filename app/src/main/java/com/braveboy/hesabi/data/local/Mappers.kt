@@ -84,6 +84,7 @@ fun TransactionEntity.toDomain() = Transaction(
     note = note,
     source = TransactionSource.entries.firstOrNull { it.name == source } ?: TransactionSource.MANUAL,
     externalRef = externalRef,
+    receiptImagePath = receiptImagePath,
     createdAtMillis = createdAtMillis,
     updatedAtMillis = updatedAtMillis,
 )
@@ -99,6 +100,7 @@ fun Transaction.toEntity() = TransactionEntity(
     note = note,
     source = source.name,
     externalRef = externalRef,
+    receiptImagePath = receiptImagePath,
     createdAtMillis = createdAtMillis,
     updatedAtMillis = updatedAtMillis,
 )
