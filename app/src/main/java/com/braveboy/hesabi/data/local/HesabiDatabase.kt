@@ -10,6 +10,7 @@ import com.braveboy.hesabi.data.local.dao.DebtDao
 import com.braveboy.hesabi.data.local.dao.InstallmentDao
 import com.braveboy.hesabi.data.local.dao.LoanDao
 import com.braveboy.hesabi.data.local.dao.PersonDao
+import com.braveboy.hesabi.data.local.dao.RecurringTransactionDao
 import com.braveboy.hesabi.data.local.dao.SavingsGoalDao
 import com.braveboy.hesabi.data.local.dao.SenderRuleDao
 import com.braveboy.hesabi.data.local.dao.SmsDao
@@ -22,6 +23,7 @@ import com.braveboy.hesabi.data.local.entity.DebtEntity
 import com.braveboy.hesabi.data.local.entity.InstallmentEntity
 import com.braveboy.hesabi.data.local.entity.LoanEntity
 import com.braveboy.hesabi.data.local.entity.PersonEntity
+import com.braveboy.hesabi.data.local.entity.RecurringTransactionEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -41,8 +43,9 @@ import com.braveboy.hesabi.data.local.entity.TransactionEntity
         ChequeEntity::class,
         LoanEntity::class,
         InstallmentEntity::class,
+        RecurringTransactionEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class HesabiDatabase : RoomDatabase() {
@@ -58,6 +61,7 @@ abstract class HesabiDatabase : RoomDatabase() {
     abstract fun chequeDao(): ChequeDao
     abstract fun loanDao(): LoanDao
     abstract fun installmentDao(): InstallmentDao
+    abstract fun recurringTransactionDao(): RecurringTransactionDao
 
     companion object {
         const val NAME = "hesabi.db"

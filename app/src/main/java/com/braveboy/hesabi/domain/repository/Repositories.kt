@@ -15,6 +15,7 @@ import com.braveboy.hesabi.domain.model.Loan
 import com.braveboy.hesabi.domain.model.LoanWithInstallments
 import com.braveboy.hesabi.domain.model.Person
 import com.braveboy.hesabi.domain.model.PersonWithDebts
+import com.braveboy.hesabi.domain.model.RecurringTransaction
 import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
@@ -162,6 +163,19 @@ interface LoanRepository {
     suspend fun deleteLoan(id: String)
     suspend fun payInstallment(installmentId: String, paidAtEpochDay: Long)
     suspend fun revertInstallmentPayment(installmentId: String)
+}
+
+interface RecurringTransactionRepository {
+    fun observeAll(): Flow<List<RecurringTransaction>>
+    fun observeActive(): Flow<List<RecurringTransaction>>
+    fun observeDue(todayEpochDay: Long): Flow<List<RecurringTransaction>>
+    suspend fun getAll(): List<RecurringTransaction>
+    suspend fun getDue(todayEpochDay: Long): List<RecurringTransaction>
+    suspend fun getById(id: String): RecurringTransaction?
+    suspend fun save(recurring: RecurringTransaction)
+    suspend fun delete(id: String)
+    suspend fun updateOccurrence(id: String, appliedEpochDay: Long, nextOccurrenceEpochDay: Long)
+    suspend fun toggleActive(id: String, isActive: Boolean)
 }
 
 interface BackupRepository {

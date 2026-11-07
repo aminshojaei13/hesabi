@@ -89,6 +89,32 @@ class AccountsViewModel(
         }
     }
 
+    fun reconcileAccount(accountId: String, actualBankBalanceToman: Long, currentBookBalanceToman: Long) {
+        val diff = actualBankBalanceToman - currentBookBalanceToman
+        if (diff == 0L) {
+            notice.value = "موجودی حساب با بانک کاملاً مطابقت دارد و تراز است." to null
+            return
+        }
+        viewModelScope.launch {
+            val type = if (diff > 0) com.braveboy.hesabi.domain.model.TransactionType.INCOME else com.braveboy.hesabi.domain.model.TransactionType.EXPENSE
+            val amount = kotlin.math.abs(diff)
+            val note = if (diff > 0) "تعدیل مغایرت بانکی (مازاد)" else "تعدیل مغایرت بانکی (کسری)"
+            val today = com.braveboy.hesabi.core.date.JalaliDate.today().toEpochDay()
+            val transaction = com.braveboy.hesabi.domain.model.Transaction(
+                id = UUID.randomUUID().toString(),
+                type = type,
+                amountToman = amount,
+                accountId = accountId,
+                occurredOnEpochDay = today,
+                note = note,
+                source = com.braveboy.hesabi.domain.model.TransactionSource.MANUAL,
+                createdAtMillis = System.currentTimeMillis(),
+            )
+            transactionRepository.save(transaction)
+            notice.value = "مغایرت‌گیری با موفقیت ثبت شد و حساب تراز گردید." to null
+        }
+    }
+
     fun dismissNotice() {
         notice.value = null to null
     }

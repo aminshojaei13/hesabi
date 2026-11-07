@@ -200,3 +200,29 @@ data class InstallmentEntity(
     val isPaid: Boolean,
     val paidAtEpochDay: Long?,
 )
+
+@Entity(
+    tableName = "recurring_transactions",
+    indices = [
+        Index("isActive"),
+        Index("nextOccurrenceEpochDay"),
+    ],
+)
+data class RecurringTransactionEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val type: String,
+    val amountToman: Long,
+    val accountId: String,
+    val toAccountId: String?,
+    val categoryId: String?,
+    val frequency: String,
+    val interval: Int,
+    val dayOfMonth: Int?,
+    val nextOccurrenceEpochDay: Long,
+    val lastAppliedEpochDay: Long?,
+    val autoApply: Boolean,
+    val isActive: Boolean,
+    val note: String,
+    val createdAtMillis: Long,
+)

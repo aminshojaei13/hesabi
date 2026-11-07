@@ -194,6 +194,37 @@ object BankSmsParser {
         }
     }
 
+    /**
+     * Extracts the account balance mentioned in an SMS after keywords like "مانده", "موجودی", "اعتبار".
+     * Converts to Toman based on unit or fallback to [amountsAreRial].
+     */
+    fun extractStatedBalanceToman(body: String, amountsAreRial: Boolean = true): Long? {
+        val text = normalize(body)
+        val regex = Regex("""(?<![\d,])(\d{1,3}(?:[,]\d{3})+|\d{4,})(?:\s*(ریال|ريال|تومان|تومن|IRR|IRT))?""")
+        for (keyword in balanceKeywords) {
+            val idx = text.indexOf(keyword)
+            if (idx != -1) {
+                val window = text.substring(idx, (idx + 60).coerceAtMost(text.length))
+                val match = regex.find(window)
+                if (match != null) {
+                    val raw = match.groupValues[1].replace(",", "")
+                    val value = raw.toLongOrNull() ?: continue
+                    val currency = match.groupValues[2]
+                    val isToman = currency in listOf("تومان", "تومن", "IRT")
+                    val isRial = currency in listOf("ریال", "ريال", "IRR")
+                    val toman = when {
+                        isToman -> value
+                        isRial -> value / 10
+                        amountsAreRial -> value / 10
+                        else -> value
+                    }
+                    if (toman >= 0) return toman
+                }
+            }
+        }
+        return null
+    }
+
     private fun normalize(body: String): String {
         val ascii = Digits.toAscii(body)
         return ascii

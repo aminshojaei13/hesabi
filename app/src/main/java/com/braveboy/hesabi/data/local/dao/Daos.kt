@@ -14,6 +14,7 @@ import com.braveboy.hesabi.data.local.entity.DebtEntity
 import com.braveboy.hesabi.data.local.entity.InstallmentEntity
 import com.braveboy.hesabi.data.local.entity.LoanEntity
 import com.braveboy.hesabi.data.local.entity.PersonEntity
+import com.braveboy.hesabi.data.local.entity.RecurringTransactionEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -377,5 +378,38 @@ interface InstallmentDao {
     suspend fun deleteByLoanId(loanId: String)
 
     @Query("DELETE FROM installments")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface RecurringTransactionDao {
+    @Query("SELECT * FROM recurring_transactions ORDER BY isActive DESC, nextOccurrenceEpochDay ASC")
+    fun observeAll(): Flow<List<RecurringTransactionEntity>>
+
+    @Query("SELECT * FROM recurring_transactions WHERE isActive = 1 ORDER BY nextOccurrenceEpochDay ASC")
+    fun observeActive(): Flow<List<RecurringTransactionEntity>>
+
+    @Query("SELECT * FROM recurring_transactions")
+    suspend fun getAll(): List<RecurringTransactionEntity>
+
+    @Query("SELECT * FROM recurring_transactions WHERE isActive = 1 AND nextOccurrenceEpochDay <= :todayEpochDay")
+    suspend fun getDue(todayEpochDay: Long): List<RecurringTransactionEntity>
+
+    @Query("SELECT * FROM recurring_transactions WHERE id = :id")
+    suspend fun findById(id: String): RecurringTransactionEntity?
+
+    @Upsert
+    suspend fun upsert(recurring: RecurringTransactionEntity)
+
+    @Query("UPDATE recurring_transactions SET lastAppliedEpochDay = :appliedDay, nextOccurrenceEpochDay = :nextDay WHERE id = :id")
+    suspend fun updateOccurrence(id: String, appliedDay: Long, nextDay: Long)
+
+    @Query("UPDATE recurring_transactions SET isActive = :isActive WHERE id = :id")
+    suspend fun updateActive(id: String, isActive: Boolean)
+
+    @Query("DELETE FROM recurring_transactions WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM recurring_transactions")
     suspend fun deleteAll()
 }
