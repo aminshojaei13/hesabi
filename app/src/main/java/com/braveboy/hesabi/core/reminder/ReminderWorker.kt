@@ -25,12 +25,18 @@ class ReminderWorker(
         val app = context.applicationContext as? HesabiApp ?: return Result.success()
         val container = app.container
 
+        val today = JalaliDate.today().toEpochDay()
+
+        // Automatically process due recurring transactions if autoApply is enabled
+        runCatching {
+            container.recurringTransactionProcessor.processDueTransactions(today)
+        }
+
         val settings = container.settingsRepository.current()
         if (!settings.remindersEnabled) return Result.success()
 
         createNotificationChannel()
 
-        val today = JalaliDate.today().toEpochDay()
         val dueWindowCheques = today + 2
         val dueWindowInstallments = today + 3
 

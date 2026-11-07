@@ -13,6 +13,7 @@ import com.braveboy.hesabi.data.repository.ChequeRepositoryImpl
 import com.braveboy.hesabi.data.repository.DebtRepositoryImpl
 import com.braveboy.hesabi.data.repository.LoanRepositoryImpl
 import com.braveboy.hesabi.data.repository.PersonRepositoryImpl
+import com.braveboy.hesabi.data.repository.RecurringTransactionRepositoryImpl
 import com.braveboy.hesabi.data.repository.SavingsGoalRepositoryImpl
 import com.braveboy.hesabi.data.repository.SettingsRepositoryImpl
 import com.braveboy.hesabi.data.repository.SmsRepositoryImpl
@@ -27,6 +28,7 @@ import com.braveboy.hesabi.domain.repository.ChequeRepository
 import com.braveboy.hesabi.domain.repository.DebtRepository
 import com.braveboy.hesabi.domain.repository.LoanRepository
 import com.braveboy.hesabi.domain.repository.PersonRepository
+import com.braveboy.hesabi.domain.repository.RecurringTransactionRepository
 import com.braveboy.hesabi.domain.repository.SavingsGoalRepository
 import com.braveboy.hesabi.domain.repository.SettingsRepository
 import com.braveboy.hesabi.domain.repository.SmsRepository
@@ -45,7 +47,7 @@ class AppContainer(context: Context) {
         HesabiDatabase::class.java,
         HesabiDatabase.NAME,
     )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         .fallbackToDestructiveMigration(dropAllTables = false)
         .build()
 
@@ -59,6 +61,9 @@ class AppContainer(context: Context) {
     val debtRepository: DebtRepository = DebtRepositoryImpl(database.debtDao())
     val chequeRepository: ChequeRepository = ChequeRepositoryImpl(database.chequeDao())
     val loanRepository: LoanRepository = LoanRepositoryImpl(database, database.loanDao(), database.installmentDao())
+    val recurringTransactionRepository: RecurringTransactionRepository = RecurringTransactionRepositoryImpl(database.recurringTransactionDao())
+    val recurringTransactionProcessor: com.braveboy.hesabi.core.recurring.RecurringTransactionProcessor =
+        com.braveboy.hesabi.core.recurring.RecurringTransactionProcessor(recurringTransactionRepository, transactionRepository)
     val smsRepository: SmsRepository = SmsRepositoryImpl(
         db = database,
         smsDao = database.smsDao(),
@@ -94,6 +99,7 @@ class AppContainer(context: Context) {
     /** Removes every user row, then restores the minimal defaults. Settings are reset too. */
     suspend fun clearAllData() = withContext(Dispatchers.IO) {
         database.withTransaction {
+            database.recurringTransactionDao().deleteAll()
             database.installmentDao().deleteAll()
             database.loanDao().deleteAll()
             database.chequeDao().deleteAll()
@@ -219,5 +225,32 @@ private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
 private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `transactions` ADD COLUMN `receiptImagePath` TEXT")
+    }
+}
+
+private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `recurring_transactions` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `title` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `amountToman` INTEGER NOT NULL,
+                `accountId` TEXT NOT NULL,
+                `toAccountId` TEXT,
+                `categoryId` TEXT,
+                `frequency` TEXT NOT NULL,
+                `interval` INTEGER NOT NULL,
+                `dayOfMonth` INTEGER,
+                `nextOccurrenceEpochDay` INTEGER NOT NULL,
+                `lastAppliedEpochDay` INTEGER,
+                `autoApply` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `note` TEXT NOT NULL,
+                `createdAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_isActive` ON `recurring_transactions` (`isActive`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_nextOccurrenceEpochDay` ON `recurring_transactions` (`nextOccurrenceEpochDay`)")
     }
 }

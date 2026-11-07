@@ -13,6 +13,8 @@ import com.braveboy.hesabi.domain.model.DebtDirection
 import com.braveboy.hesabi.domain.model.Installment
 import com.braveboy.hesabi.domain.model.Loan
 import com.braveboy.hesabi.domain.model.Person
+import com.braveboy.hesabi.domain.model.RecurringFrequency
+import com.braveboy.hesabi.domain.model.RecurringTransaction
 import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
@@ -28,6 +30,7 @@ import com.braveboy.hesabi.data.local.entity.DebtEntity
 import com.braveboy.hesabi.data.local.entity.InstallmentEntity
 import com.braveboy.hesabi.data.local.entity.LoanEntity
 import com.braveboy.hesabi.data.local.entity.PersonEntity
+import com.braveboy.hesabi.data.local.entity.RecurringTransactionEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -289,4 +292,42 @@ fun Installment.toEntity() = InstallmentEntity(
     dueEpochDay = dueEpochDay,
     isPaid = isPaid,
     paidAtEpochDay = paidAtEpochDay,
+)
+
+fun RecurringTransactionEntity.toDomain() = RecurringTransaction(
+    id = id,
+    title = title,
+    type = TransactionType.entries.firstOrNull { it.name == type } ?: TransactionType.EXPENSE,
+    amountToman = amountToman,
+    accountId = accountId,
+    toAccountId = toAccountId,
+    categoryId = categoryId,
+    frequency = RecurringFrequency.entries.firstOrNull { it.name == frequency } ?: RecurringFrequency.MONTHLY,
+    interval = interval,
+    dayOfMonth = dayOfMonth,
+    nextOccurrenceEpochDay = nextOccurrenceEpochDay,
+    lastAppliedEpochDay = lastAppliedEpochDay,
+    autoApply = autoApply,
+    isActive = isActive,
+    note = note,
+    createdAtMillis = createdAtMillis,
+)
+
+fun RecurringTransaction.toEntity() = RecurringTransactionEntity(
+    id = id,
+    title = title,
+    type = type.name,
+    amountToman = amountToman,
+    accountId = accountId,
+    toAccountId = toAccountId,
+    categoryId = categoryId,
+    frequency = frequency.name,
+    interval = interval,
+    dayOfMonth = dayOfMonth,
+    nextOccurrenceEpochDay = nextOccurrenceEpochDay,
+    lastAppliedEpochDay = lastAppliedEpochDay,
+    autoApply = autoApply,
+    isActive = isActive,
+    note = note,
+    createdAtMillis = createdAtMillis,
 )

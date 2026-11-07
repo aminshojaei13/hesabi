@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.AlertDialog
@@ -73,15 +74,28 @@ fun AccountsScreen(
     var editing by remember { mutableStateOf<Account?>(null) }
     var creating by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Account?>(null) }
+    var reconciling by remember { mutableStateOf<AccountWithBalance?>(null) }
 
     AccountsContent(
         state = state,
         onBack = onBack,
         onAdd = { creating = true },
         onEdit = { editing = it },
+        onReconcile = { reconciling = it },
         onDismissNotice = viewModel::dismissNotice,
         modifier = modifier,
     )
+
+    reconciling?.let { item ->
+        ReconciliationDialog(
+            item = item,
+            onDismiss = { reconciling = null },
+            onConfirmReconcile = { actual ->
+                viewModel.reconcileAccount(item.account.id, actual, item.balanceToman)
+                reconciling = null
+            },
+        )
+    }
 
     if (creating || editing != null) {
         val account = editing
@@ -126,6 +140,7 @@ fun AccountsContent(
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onEdit: (Account) -> Unit,
+    onReconcile: (AccountWithBalance) -> Unit,
     onDismissNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -174,7 +189,11 @@ fun AccountsContent(
                 }
             }
             items(state.accounts, key = { it.account.id }) { item ->
-                AccountCard(item = item, onClick = { onEdit(item.account) })
+                AccountCard(
+                    item = item,
+                    onClick = { onEdit(item.account) },
+                    onReconcile = { onReconcile(item) },
+                )
             }
             item {
                 HesabiButton(
@@ -190,7 +209,11 @@ fun AccountsContent(
 }
 
 @Composable
-private fun AccountCard(item: AccountWithBalance, onClick: () -> Unit) {
+private fun AccountCard(
+    item: AccountWithBalance,
+    onClick: () -> Unit,
+    onReconcile: () -> Unit,
+) {
     val account = item.account
     val color = Color(account.colorArgb)
     Surface(
@@ -230,12 +253,25 @@ private fun AccountCard(item: AccountWithBalance, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                text = Money.format(item.balanceToman, withUnit = false),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (item.balanceToman < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = Money.format(item.balanceToman, withUnit = false),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (item.balanceToman < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(
+                    onClick = onReconcile,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.AccountBalance,
+                        contentDescription = "مغایرت‌گیری با بانک",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -348,7 +384,7 @@ private fun AccountsPreview() {
     HesabiTheme {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                AccountsContent(state, {}, {}, {}, {})
+                AccountsContent(state, {}, {}, {}, {}, {})
             }
         }
     }
@@ -365,7 +401,7 @@ private fun AccountsEmptyPreview() {
     HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.DARK) {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                AccountsContent(AccountsUiState(loading = false), {}, {}, {}, {})
+                AccountsContent(AccountsUiState(loading = false), {}, {}, {}, {}, {})
             }
         }
     }

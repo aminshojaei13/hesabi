@@ -57,6 +57,7 @@ import com.braveboy.hesabi.ui.entry.AddEditScreen
 import com.braveboy.hesabi.ui.home.HomeScreen
 import com.braveboy.hesabi.ui.more.MoreScreen
 import com.braveboy.hesabi.ui.onboarding.OnboardingScreen
+import com.braveboy.hesabi.ui.recurring.RecurringTransactionsScreen
 import com.braveboy.hesabi.ui.reports.ReportsScreen
 import com.braveboy.hesabi.ui.security.AppLockScreen
 import com.braveboy.hesabi.ui.settings.SettingsScreen
@@ -77,6 +78,7 @@ object Routes {
     const val BACKUP = "backup"
     const val SETTINGS = "settings"
     const val DEBTS = "debts"
+    const val RECURRING = "recurring"
     const val ENTRY = "entry?editId={editId}&type={type}"
 
     fun newEntry(type: TransactionType): String = "entry?type=${type.name}"
@@ -198,6 +200,7 @@ private fun MainScaffold(
                         onCategories = { navController.navigate(Routes.CATEGORIES) },
                         onBudget = { navController.navigate(Routes.BUDGET) },
                         onDebts = { navController.navigate(Routes.DEBTS) },
+                        onRecurring = { navController.navigate(Routes.RECURRING) },
                         onSms = { navController.navigate(Routes.SMS) },
                         onBackup = { navController.navigate(Routes.BACKUP) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
@@ -253,6 +256,9 @@ private fun MainScaffold(
                 }
                 composable(Routes.DEBTS) {
                     DebtsAndCommitmentsScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.RECURRING) {
+                    RecurringTransactionsScreen(container = container, onBack = { navController.popBackStack() })
                 }
             }
         }

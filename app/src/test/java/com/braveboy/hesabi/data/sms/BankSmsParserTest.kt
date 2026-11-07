@@ -145,4 +145,15 @@ class BankSmsParserTest {
     fun `date-only helper matches test anchor`() {
         assertEquals(JalaliDate(1405, 8, 6), todayAsDate)
     }
+
+    @Test
+    fun `extractStatedBalanceToman parses balance in rial or toman`() {
+        val smsRial = "برداشت ۱٬۲۵۰٬۰۰۰ ریال از حساب ۱۲۳۴۵۶۷۸۹۰ مانده ۴۵٬۶۷۸٬۹۰۰ ریال"
+        val balanceToman1 = BankSmsParser.extractStatedBalanceToman(smsRial, amountsAreRial = true)
+        assertEquals(4_567_890L, balanceToman1)
+
+        val smsToman = "خرید اینترنتی 200,000 تومن موجودی: 1,500,000 تومان"
+        val balanceToman2 = BankSmsParser.extractStatedBalanceToman(smsToman)
+        assertEquals(1_500_000L, balanceToman2)
+    }
 }

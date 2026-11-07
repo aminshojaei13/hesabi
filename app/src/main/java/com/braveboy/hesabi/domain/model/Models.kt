@@ -47,6 +47,7 @@ enum class TransactionSource {
     IMPORT,
     QUICK_REPEAT,
     VOICE,
+    RECURRING,
 }
 
 data class Transaction(
@@ -285,3 +286,29 @@ data class LoanWithInstallments(
     val nextPendingInstallment: Installment?
         get() = installments.filter { !it.isPaid }.minByOrNull { it.dueEpochDay }
 }
+
+enum class RecurringFrequency(val labelFa: String) {
+    DAILY("روزانه"),
+    WEEKLY("هفتگی"),
+    MONTHLY("ماهانه"),
+    YEARLY("سالانه"),
+}
+
+data class RecurringTransaction(
+    val id: String,
+    val title: String,
+    val type: TransactionType,
+    val amountToman: Long,
+    val accountId: String,
+    val toAccountId: String? = null,
+    val categoryId: String? = null,
+    val frequency: RecurringFrequency = RecurringFrequency.MONTHLY,
+    val interval: Int = 1,
+    val dayOfMonth: Int? = null,
+    val nextOccurrenceEpochDay: Long,
+    val lastAppliedEpochDay: Long? = null,
+    val autoApply: Boolean = true,
+    val isActive: Boolean = true,
+    val note: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)

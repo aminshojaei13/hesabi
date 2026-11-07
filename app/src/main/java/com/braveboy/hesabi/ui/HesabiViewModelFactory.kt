@@ -98,6 +98,12 @@ class HesabiViewModelFactory(
                 loanRepository = container.loanRepository,
                 settingsRepository = container.settingsRepository,
             )
+            modelClass.isAssignableFrom(com.braveboy.hesabi.ui.recurring.RecurringTransactionsViewModel::class.java) -> com.braveboy.hesabi.ui.recurring.RecurringTransactionsViewModel(
+                recurringRepo = container.recurringTransactionRepository,
+                accountRepo = container.accountRepository,
+                categoryRepo = container.categoryRepository,
+                processor = container.recurringTransactionProcessor,
+            )
             else -> error("ViewModel not registered: ${modelClass.name}")
         }
         return viewModel as T
