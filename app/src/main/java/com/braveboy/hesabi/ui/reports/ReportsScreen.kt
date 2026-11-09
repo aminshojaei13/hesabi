@@ -1,5 +1,9 @@
 package com.braveboy.hesabi.ui.reports
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,9 +25,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,6 +49,17 @@ import com.braveboy.hesabi.ui.components.ComparisonBadge
 import com.braveboy.hesabi.ui.components.DailyBarChart
 import com.braveboy.hesabi.ui.components.DonutChart
 import com.braveboy.hesabi.ui.components.EmptyState
+import com.braveboy.hesabi.ui.components.HesabiButton
+import com.braveboy.hesabi.ui.components.HesabiButtonVariant
+import com.braveboy.hesabi.ui.components.InfoBanner
+import com.braveboy.hesabi.core.export.PdfReportWriter
+import com.braveboy.hesabi.core.export.XlsxWriter
+import com.braveboy.hesabi.domain.export.ExportData
+import com.braveboy.hesabi.domain.export.ReportExportBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import com.braveboy.hesabi.ui.components.HesabiCard
 import com.braveboy.hesabi.ui.components.LoadingSkeleton
 import com.braveboy.hesabi.ui.components.MonthSwitcher
@@ -58,12 +79,76 @@ fun ReportsScreen(
 ) {
     val viewModel: ReportsViewModel = hesabiViewModel(container)
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var notice by remember { mutableStateOf<String?>(null) }
+
+    fun exportData(): ExportData? {
+        val report = state.report ?: return null
+        return ExportData(
+            period = state.period,
+            report = report,
+            transactions = state.transactions,
+            categories = state.categories,
+            accounts = state.accounts,
+            budgets = state.budgets,
+        )
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf"),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val data = exportData() ?: return@rememberLauncherForActivityResult
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val bytes = PdfReportWriter.write(ReportExportBuilder.pdf(data), context)
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                            ?: throw IOException("نوشتن فایل ممکن نشد.")
+                    }
+                }.onSuccess {
+                    notice = "PDF گزارش ساخته شد."
+                }.onFailure {
+                    notice = "ساخت PDF انجام نشد: ${it.message.orEmpty()}"
+                }
+            }
+        }
+    }
+
+    val xlsxLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val data = exportData() ?: return@rememberLauncherForActivityResult
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { stream ->
+                            XlsxWriter.write(stream, ReportExportBuilder.xlsx(data))
+                        } ?: throw IOException("نوشتن فایل ممکن نشد.")
+                    }
+                }.onSuccess {
+                    notice = "فایل اکسل گزارش ساخته شد."
+                }.onFailure {
+                    notice = "ساخت اکسل انجام نشد: ${it.message.orEmpty()}"
+                }
+            }
+        }
+    }
+
     ReportsContent(
         state = state,
         onPreviousMonth = viewModel::previousMonth,
         onNextMonth = viewModel::nextMonth,
         onCurrentMonth = viewModel::currentMonth,
         onOpenBudget = onOpenBudget,
+        onExportPdf = { pdfLauncher.launch("hesabi-report-${state.period.key}.pdf") },
+        onExportXlsx = { xlsxLauncher.launch("hesabi-report-${state.period.key}.xlsx") },
+        notice = notice,
+        onDismissNotice = { notice = null },
         modifier = modifier,
     )
 }
@@ -75,6 +160,10 @@ fun ReportsContent(
     onNextMonth: () -> Unit,
     onCurrentMonth: () -> Unit,
     onOpenBudget: () -> Unit,
+    onExportPdf: () -> Unit = {},
+    onExportXlsx: () -> Unit = {},
+    notice: String? = null,
+    onDismissNotice: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val report = state.report
@@ -198,6 +287,35 @@ fun ReportsContent(
                     onEdit = onOpenBudget,
                 )
             }
+            item {
+                HesabiCard {
+                    SectionHeader("خروجی گزارش")
+                    Text(
+                        text = "PDF برای چاپ و اشتراک، اکسل برای باز کردن در Google Sheets.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
+                        HesabiButton(
+                            text = "PDF",
+                            onClick = onExportPdf,
+                            icon = Icons.Rounded.PictureAsPdf,
+                            variant = HesabiButtonVariant.SECONDARY,
+                            modifier = Modifier.weight(1f),
+                        )
+                        HesabiButton(
+                            text = "Excel",
+                            onClick = onExportXlsx,
+                            icon = Icons.Rounded.TableChart,
+                            variant = HesabiButtonVariant.SECONDARY,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+        notice?.let { text ->
+            item { InfoBanner(text = text, actionLabel = "باشه", onAction = onDismissNotice) }
         }
         if (state.trend.any { it.expenseToman > 0 }) {
             item {

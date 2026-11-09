@@ -13,12 +13,19 @@ import com.braveboy.hesabi.domain.model.Installment
 import com.braveboy.hesabi.domain.model.Loan
 import com.braveboy.hesabi.domain.model.LoanWithInstallments
 import com.braveboy.hesabi.domain.model.Person
+import com.braveboy.hesabi.domain.model.LinkedEntityType
 import com.braveboy.hesabi.domain.model.PersonWithDebts
+import com.braveboy.hesabi.domain.model.Transaction
+import com.braveboy.hesabi.domain.model.TransactionSource
+import com.braveboy.hesabi.domain.model.TransactionType
+import com.braveboy.hesabi.domain.repository.AccountRepository
+import com.braveboy.hesabi.domain.repository.CategoryRepository
 import com.braveboy.hesabi.domain.repository.ChequeRepository
 import com.braveboy.hesabi.domain.repository.DebtRepository
 import com.braveboy.hesabi.domain.repository.LoanRepository
 import com.braveboy.hesabi.domain.repository.PersonRepository
 import com.braveboy.hesabi.domain.repository.SettingsRepository
+import com.braveboy.hesabi.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -112,7 +119,10 @@ class DebtsAndCommitmentsViewModel(
     private val debtRepository: DebtRepository,
     private val chequeRepository: ChequeRepository,
     private val loanRepository: LoanRepository,
-    settingsRepository: SettingsRepository,
+    private val transactionRepository: TransactionRepository,
+    private val accountRepository: AccountRepository,
+    private val categoryRepository: CategoryRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebtsUiState())
@@ -263,7 +273,29 @@ class DebtsAndCommitmentsViewModel(
     private fun settleDebt(debtId: String, amountToman: Long) {
         if (amountToman <= 0) return
         viewModelScope.launch {
+            val debt = debtRepository.getById(debtId)
             debtRepository.settle(debtId, amountToman)
+            if (debt != null) {
+                // The cash movement must hit an account, otherwise reports and balances
+                // silently disagree with the debt book (M25).
+                postLinkedTransaction(
+                    type = if (debt.direction == DebtDirection.LENT) {
+                        TransactionType.INCOME
+                    } else {
+                        TransactionType.EXPENSE
+                    },
+                    amountToman = amountToman,
+                    note = if (debt.direction == DebtDirection.LENT) {
+                        "دریافت طلب"
+                    } else {
+                        "پرداخت بدهی"
+                    },
+                    ref = "debt:$debtId:${UUID.randomUUID()}",
+                    linkType = LinkedEntityType.DEBT,
+                    linkId = debtId,
+                    accountId = null,
+                )
+            }
             _uiState.update { it.copy(settleDebtTarget = null) }
         }
     }
@@ -298,8 +330,70 @@ class DebtsAndCommitmentsViewModel(
 
     private fun updateChequeStatus(chequeId: String, status: ChequeStatus) {
         viewModelScope.launch {
+            val cheque = chequeRepository.getById(chequeId)
             chequeRepository.updateStatus(chequeId, status)
+            if (cheque != null && status == ChequeStatus.CLEARED) {
+                val ref = "cheque:$chequeId"
+                if (transactionRepository.findByExternalRef(ref) == null) {
+                    postLinkedTransaction(
+                        type = if (cheque.direction == ChequeDirection.RECEIVED) {
+                            TransactionType.INCOME
+                        } else {
+                            TransactionType.EXPENSE
+                        },
+                        amountToman = cheque.amountToman,
+                        note = "وصول چک ${cheque.bankName}",
+                        ref = ref,
+                        linkType = LinkedEntityType.CHEQUE,
+                        linkId = chequeId,
+                        accountId = null,
+                    )
+                }
+            }
         }
+    }
+
+    /** Creates the account movement for a commitment, using the default account. */
+    private suspend fun postLinkedTransaction(
+        type: TransactionType,
+        amountToman: Long,
+        note: String,
+        ref: String,
+        linkType: String,
+        linkId: String,
+        accountId: String?,
+    ) {
+        if (amountToman <= 0) return
+        val settings = settingsRepository.current()
+        val accounts = accountRepository.getAll()
+        val resolvedAccount = accountId
+            ?.takeIf { id -> accounts.any { it.id == id } }
+            ?: settings.defaultAccountId?.takeIf { id -> accounts.any { it.id == id } }
+            ?: accounts.firstOrNull()?.id
+            ?: return
+        val kind = if (type == TransactionType.INCOME) {
+            com.braveboy.hesabi.domain.model.CategoryKind.INCOME
+        } else {
+            com.braveboy.hesabi.domain.model.CategoryKind.EXPENSE
+        }
+        val category = categoryRepository.getAll()
+            .firstOrNull { it.kind == kind && it.name == "سایر" }
+            ?: categoryRepository.getAll().firstOrNull { it.kind == kind }
+        transactionRepository.save(
+            Transaction(
+                id = UUID.randomUUID().toString(),
+                type = type,
+                amountToman = amountToman,
+                accountId = resolvedAccount,
+                categoryId = category?.id,
+                occurredOnEpochDay = JalaliDate.today().toEpochDay(),
+                note = note,
+                source = TransactionSource.MANUAL,
+                externalRef = ref,
+                linkedEntityType = linkType,
+                linkedEntityId = linkId,
+            ),
+        )
     }
 
     private fun deleteCheque(chequeId: String) {
@@ -347,13 +441,32 @@ class DebtsAndCommitmentsViewModel(
 
     private fun payInstallment(installmentId: String) {
         viewModelScope.launch {
+            val loanWithInstallments = uiState.value.loansWithInstallments
+                .firstOrNull { loan -> loan.installments.any { it.id == installmentId } }
+            val installment = loanWithInstallments?.installments?.firstOrNull { it.id == installmentId }
             loanRepository.payInstallment(installmentId, JalaliDate.today().toEpochDay())
+            if (installment != null && loanWithInstallments != null) {
+                val existing = transactionRepository.findByExternalRef("installment:$installmentId")
+                if (existing == null) {
+                    postLinkedTransaction(
+                        type = TransactionType.EXPENSE,
+                        amountToman = installment.amountToman,
+                        note = "قسط ${installment.installmentNumber} ${loanWithInstallments.loan.title}",
+                        ref = "installment:$installmentId",
+                        linkType = LinkedEntityType.INSTALLMENT,
+                        linkId = installmentId,
+                        accountId = loanWithInstallments.loan.accountId,
+                    )
+                }
+            }
         }
     }
 
     private fun revertInstallment(installmentId: String) {
         viewModelScope.launch {
             loanRepository.revertInstallmentPayment(installmentId)
+            transactionRepository.findByLinkedEntity(LinkedEntityType.INSTALLMENT, installmentId)
+                .forEach { transactionRepository.delete(it.id) }
         }
     }
 

@@ -23,6 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,9 +83,18 @@ fun TransactionRow(
         else -> accountName
     }
 
+    val spokenAmount = if (com.braveboy.hesabi.ui.theme.LocalHesabiDisplay.current.hideAmounts) {
+        "مبلغ پنهان"
+    } else {
+        Money.format(transaction.amountToman)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = "$title، ${transaction.type.label}، $spokenAmount، $subtitle"
+            }
             .then(
                 if (onLongClick != null) {
                     Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)

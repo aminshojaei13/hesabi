@@ -126,8 +126,14 @@ class AddEditViewModel(
                 categories.any { it.id == current.draft.categoryId && it.kind == kind } -> current.draft.categoryId
                 else -> categories.firstOrNull { it.kind == kind }?.id
             }
+            val toAccountId = when {
+                type != TransactionType.TRANSFER -> null
+                current.draft.toAccountId != null && current.draft.toAccountId != current.draft.accountId ->
+                    current.draft.toAccountId
+                else -> current.accounts.firstOrNull { it.id != current.draft.accountId }?.id
+            }
             current.copy(
-                draft = current.draft.copy(type = type, categoryId = categoryId),
+                draft = current.draft.copy(type = type, categoryId = categoryId, toAccountId = toAccountId),
                 errors = emptyList(),
             )
         }
@@ -225,8 +231,21 @@ class AddEditViewModel(
                 createdAtMillis = snapshot.createdAtMillis,
                 updatedAtMillis = System.currentTimeMillis(),
             )
-            transactionRepository.save(transaction)
-            _state.update { it.copy(saving = false, finished = true, duplicateOf = null) }
+            runCatching { transactionRepository.save(transaction) }
+                .onSuccess {
+                    _state.update { it.copy(saving = false, finished = true, duplicateOf = null) }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            saving = false,
+                            errors = listOf(
+                                "ذخیره نشد. دوباره تلاش کن." +
+                                    (error.message?.let { message -> " ($message)" } ?: ""),
+                            ),
+                        )
+                    }
+                }
         }
     }
 
@@ -239,8 +258,13 @@ class AddEditViewModel(
     fun delete() {
         val id = _state.value.editingId ?: return
         viewModelScope.launch {
-            transactionRepository.delete(id)
-            _state.update { it.copy(deleted = true, finished = true) }
+            runCatching { transactionRepository.delete(id) }
+                .onSuccess { _state.update { it.copy(deleted = true, finished = true) } }
+                .onFailure {
+                    _state.update { state ->
+                        state.copy(errors = listOf("حذف انجام نشد. دوباره تلاش کن."))
+                    }
+                }
         }
     }
 

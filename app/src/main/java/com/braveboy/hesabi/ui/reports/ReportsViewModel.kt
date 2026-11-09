@@ -7,8 +7,10 @@ import com.braveboy.hesabi.domain.logic.ReportCalculator
 import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.MonthReport
+import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.Transaction
 import com.braveboy.hesabi.domain.model.TransactionType
+import com.braveboy.hesabi.domain.repository.AccountRepository
 import com.braveboy.hesabi.domain.repository.BudgetRepository
 import com.braveboy.hesabi.domain.repository.CategoryRepository
 import com.braveboy.hesabi.domain.repository.TransactionRepository
@@ -31,6 +33,10 @@ data class ReportsUiState(
     val report: MonthReport? = null,
     val trend: List<MonthPoint> = emptyList(),
     val transactionCount: Int = 0,
+    val transactions: List<Transaction> = emptyList(),
+    val categories: List<Category> = emptyList(),
+    val accounts: List<Account> = emptyList(),
+    val budgets: List<Budget> = emptyList(),
     val loading: Boolean = true,
 )
 
@@ -39,6 +45,7 @@ class ReportsViewModel(
     transactionRepository: TransactionRepository,
     categoryRepository: CategoryRepository,
     budgetRepository: BudgetRepository,
+    accountRepository: AccountRepository,
 ) : ViewModel() {
 
     private val period = MutableStateFlow(MonthPeriod.current())
@@ -47,13 +54,19 @@ class ReportsViewModel(
         val transactions: List<Transaction>,
         val categories: List<Category>,
         val budgets: List<Budget>,
+        val accounts: List<Account>,
     )
 
     private val inputs = combine(
-        transactionRepository.observeAll(),
-        categoryRepository.observeAll(),
-        period.flatMapLatest { budgetRepository.observeForPeriod(it.key) },
-    ) { transactions, categories, budgets -> Inputs(transactions, categories, budgets) }
+        combine(
+            transactionRepository.observeAll(),
+            categoryRepository.observeAll(),
+            period.flatMapLatest { budgetRepository.observeForPeriod(it.key) },
+        ) { transactions, categories, budgets -> Triple(transactions, categories, budgets) },
+        accountRepository.observeAll(),
+    ) { (transactions, categories, budgets), accounts ->
+        Inputs(transactions, categories, budgets, accounts)
+    }
 
     val state: StateFlow<ReportsUiState> = combine(period, inputs) { current, data ->
         val previous = current.previous()
@@ -83,6 +96,10 @@ class ReportsViewModel(
             report = report,
             trend = trend,
             transactionCount = data.transactions.count { current.contains(it.occurredOnEpochDay) },
+            transactions = data.transactions.filter { current.contains(it.occurredOnEpochDay) },
+            categories = data.categories,
+            accounts = data.accounts,
+            budgets = data.budgets,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportsUiState())

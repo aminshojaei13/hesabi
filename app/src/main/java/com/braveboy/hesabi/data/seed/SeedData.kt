@@ -4,6 +4,7 @@ import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.AccountKind
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.CategoryKind
+import com.braveboy.hesabi.domain.model.QuickTemplate
 
 /**
  * First-run data. IDs are stable so imports and future sync stay idempotent.
@@ -51,6 +52,21 @@ object SeedData {
     )
 
     val categories = expenseCategories + incomeCategories
+
+    /** Example one-tap shortcuts. Amounts stay empty so the user sets them once. */
+    val quickTemplates = listOf(
+        quickTemplate("tpl_coffee", "قهوه", "cat_food", 0),
+        quickTemplate("tpl_taxi", "تاکسی", "cat_transport", 1),
+        quickTemplate("tpl_bread", "نان", "cat_food", 2),
+        quickTemplate("tpl_lunch", "ناهار", "cat_food", 3),
+    )
+
+    private fun quickTemplate(id: String, label: String, categoryId: String, order: Int) = QuickTemplate(
+        id = id,
+        label = label,
+        categoryId = categoryId,
+        sortOrder = order,
+    )
 
     private fun category(
         id: String,

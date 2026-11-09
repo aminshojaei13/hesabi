@@ -77,4 +77,64 @@ class RecurringFrequencyCalculatorTest {
         val expected = JalaliDate(1406, 6, 20).toEpochDay()
         assertEquals(expected, next)
     }
+
+    @Test
+    fun computeNextOccurrence_monthly_keepsAnchorDayAfterShortMonth() {
+        // Shahrivar 31 -> Mehr has 30 days, so the occurrence lands on Mehr 30.
+        val shahrivar31 = JalaliDate(1405, 6, 31).toEpochDay()
+        val mehr = RecurringFrequencyCalculator.computeNextOccurrence(
+            currentEpochDay = shahrivar31,
+            frequency = RecurringFrequency.MONTHLY,
+            interval = 1,
+            dayOfMonth = 31,
+        )
+        assertEquals(JalaliDate(1405, 7, 30).toEpochDay(), mehr)
+
+        // The anchor day (31) is restored in Aban, which also has 30 days, and
+        // then Azar (30 days) must still clamp to 30 without drifting.
+        val aban = RecurringFrequencyCalculator.computeNextOccurrence(
+            currentEpochDay = mehr,
+            frequency = RecurringFrequency.MONTHLY,
+            interval = 1,
+            dayOfMonth = 31,
+        )
+        assertEquals(JalaliDate(1405, 8, 30).toEpochDay(), aban)
+
+        // A 31-day month gets day 31 again.
+        val farvardin = RecurringFrequencyCalculator.computeNextOccurrence(
+            currentEpochDay = JalaliDate(1405, 12, 29).toEpochDay(),
+            frequency = RecurringFrequency.MONTHLY,
+            interval = 1,
+            dayOfMonth = 31,
+        )
+        assertEquals(JalaliDate(1406, 1, 31).toEpochDay(), farvardin)
+    }
+
+    @Test
+    fun firstMonthlyOccurrence_usesTheSelectedDayWhenItIsAhead() {
+        val today = JalaliDate(1405, 8, 5)
+        val first = RecurringFrequencyCalculator.firstMonthlyOccurrence(today, 25)
+        assertEquals(JalaliDate(1405, 8, 25).toEpochDay(), first)
+    }
+
+    @Test
+    fun firstMonthlyOccurrence_rollsToNextMonthWhenDayHasPassed() {
+        val today = JalaliDate(1405, 8, 26)
+        val first = RecurringFrequencyCalculator.firstMonthlyOccurrence(today, 25)
+        assertEquals(JalaliDate(1405, 9, 25).toEpochDay(), first)
+    }
+
+    @Test
+    fun firstMonthlyOccurrence_clampsDay31InShortMonths() {
+        val today = JalaliDate(1405, 8, 1)
+        val first = RecurringFrequencyCalculator.firstMonthlyOccurrence(today, 31)
+        assertEquals(JalaliDate(1405, 8, 30).toEpochDay(), first)
+    }
+
+    @Test
+    fun firstMonthlyOccurrence_returnsTodayWhenItMatches() {
+        val today = JalaliDate(1405, 8, 25)
+        val first = RecurringFrequencyCalculator.firstMonthlyOccurrence(today, 25)
+        assertEquals(today.toEpochDay(), first)
+    }
 }

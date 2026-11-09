@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Telephony
 import com.braveboy.hesabi.HesabiApp
 import com.braveboy.hesabi.core.date.JalaliDate
+import com.braveboy.hesabi.domain.repository.IngestOutcome
 import kotlinx.coroutines.launch
 
 /**
@@ -31,12 +32,15 @@ class SmsReceiver : BroadcastReceiver() {
         app.applicationScope.launch {
             try {
                 if (app.container.settingsRepository.current().smsCaptureEnabled) {
-                    app.container.smsRepository.ingest(
+                    val outcome = app.container.smsRepository.ingest(
                         sender = sender,
                         body = body,
                         receivedAtMillis = System.currentTimeMillis(),
                         todayEpochDay = today,
                     )
+                    if (outcome is IngestOutcome.Added) {
+                        SmsNotifier.notifyCaptured(app)
+                    }
                 }
             } finally {
                 pendingResult.finish()

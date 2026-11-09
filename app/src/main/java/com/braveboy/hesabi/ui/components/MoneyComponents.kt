@@ -185,7 +185,7 @@ fun BalanceHero(
             AmountText(
                 amountToman = balanceToman,
                 style = MaterialTheme.typography.displaySmall,
-                hidden = false,
+                hidden = null,
                 modifier = Modifier,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.xl)) {

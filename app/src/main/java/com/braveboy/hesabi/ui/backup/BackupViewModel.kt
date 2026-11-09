@@ -3,6 +3,7 @@ package com.braveboy.hesabi.ui.backup
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.braveboy.hesabi.domain.model.BackupSummary
+import com.braveboy.hesabi.domain.repository.BackupImportMode
 import com.braveboy.hesabi.domain.repository.BackupRepository
 import com.braveboy.hesabi.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
@@ -46,9 +47,19 @@ class BackupViewModel(
                 val summary = withContext(Dispatchers.IO) {
                     openOutput().use { out -> backupRepository.exportEncrypted(out, password) }
                 }
+                val receiptsNote = if (summary.receiptCount > 0) {
+                    " ${summary.receiptCount} تصویر رسید هم داخل فایل است."
+                } else {
+                    ""
+                }
+                val skippedNote = if (summary.skippedReceipts > 0) {
+                    " ${summary.skippedReceipts} تصویر بزرگ جا نشد؛ برای پشتیبان کوچک‌تر، رسیدهای قدیمی را حذف کن."
+                } else {
+                    ""
+                }
                 status.value = status.value.copy(
                     busy = false,
-                    message = "پشتیبان رمزدار ساخته شد: ${summary.transactionCount} تراکنش.",
+                    message = "پشتیبان رمزدار ساخته شد: ${summary.transactionCount} تراکنش.$receiptsNote$skippedNote",
                     lastSummary = summary,
                 )
             } catch (error: Exception) {
@@ -73,16 +84,22 @@ class BackupViewModel(
         }
     }
 
-    fun importEncrypted(password: CharArray, openInput: () -> InputStream) {
+    fun importEncrypted(
+        password: CharArray,
+        mode: BackupImportMode = BackupImportMode.REPLACE,
+        openInput: () -> InputStream,
+    ) {
         viewModelScope.launch {
             status.value = status.value.copy(busy = true, message = null, error = null)
             try {
                 val result = withContext(Dispatchers.IO) {
-                    openInput().use { input -> backupRepository.importEncrypted(input, password) }
+                    openInput().use { input -> backupRepository.importEncrypted(input, password, mode) }
                 }
+                val modeLabel = if (mode == BackupImportMode.REPLACE) "جایگزینی" else "ادغام"
                 status.value = status.value.copy(
                     busy = false,
-                    message = "بازیابی کامل شد: ${result.summary.transactionCount} تراکنش، ${result.summary.accountCount} حساب.",
+                    message = "بازیابی ($modeLabel) کامل شد: ${result.summary.transactionCount} تراکنش، " +
+                        "${result.summary.accountCount} حساب، ${result.summary.receiptCount} رسید.",
                     lastSummary = result.summary,
                 )
             } catch (error: Exception) {

@@ -1,6 +1,5 @@
 package com.braveboy.hesabi.ui.security
 
-import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.BorderStroke
@@ -17,9 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Fingerprint
@@ -31,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,19 +37,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.braveboy.hesabi.core.money.Digits
+import com.braveboy.hesabi.core.security.PinAttemptPolicy
+import com.braveboy.hesabi.core.security.PinAttemptState
 import com.braveboy.hesabi.core.security.SecurityManager
 import com.braveboy.hesabi.ui.preview.HesabiPreview
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.LocalHesabiLumina
-import com.braveboy.hesabi.ui.theme.LocalHesabiSemantic
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -58,51 +58,89 @@ import kotlin.math.roundToInt
 fun AppLockScreen(
     pinCodeHash: String,
     biometricEnabled: Boolean,
+    failedAttempts: Int = 0,
+    lockedUntilMillis: Long = 0L,
     onUnlocked: () -> Unit,
+    onAttemptStateChanged: (failedAttempts: Int, lockedUntilMillis: Long) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var enteredPin by remember { mutableStateOf("") }
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var hasWrongAttempt by remember { mutableStateOf(false) }
     val shakeOffset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val lumina = LocalHesabiLumina.current
-    val semantic = LocalHesabiSemantic.current
+
+    val attemptState = PinAttemptState(failedAttempts, lockedUntilMillis)
+    val effectiveAttempts = PinAttemptPolicy.effectiveAttempts(attemptState, nowMillis)
+    val remainingLockMillis = PinAttemptPolicy.remainingLockMillis(attemptState, nowMillis)
+    val isLocked = remainingLockMillis > 0L
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+
+    // Clear the persisted lockout and counter once the cooldown has passed.
+    LaunchedEffect(lockedUntilMillis) {
+        if (lockedUntilMillis > 0L) {
+            val remaining = lockedUntilMillis - System.currentTimeMillis()
+            if (remaining > 0L) delay(remaining)
+            hasWrongAttempt = false
+            onAttemptStateChanged(0, 0L)
+        }
+    }
 
     // Automatically prompt biometric if enabled
     LaunchedEffect(biometricEnabled) {
         if (biometricEnabled && SecurityManager.isBiometricSupported(context)) {
             SecurityManager.showBiometricPrompt(
                 context = context,
-                onSuccess = onUnlocked,
+                onSuccess = {
+                    onAttemptStateChanged(0, 0L)
+                    onUnlocked()
+                },
                 onError = {},
             )
         }
     }
 
     fun onDigit(digit: Int) {
-        if (enteredPin.length < 4) {
-            val next = enteredPin + digit
-            enteredPin = next
-            if (next.length == 4) {
+        if (isLocked || enteredPin.length >= 4) return
+        val next = enteredPin + digit
+        enteredPin = next
+        if (next.length == 4) {
+            scope.launch {
+                val waitMillis = PinAttemptPolicy.delayBeforeAttempt(effectiveAttempts)
+                if (waitMillis > 0L) delay(waitMillis)
                 if (SecurityManager.verifyPin(next, pinCodeHash)) {
+                    hasWrongAttempt = false
+                    onAttemptStateChanged(0, 0L)
                     onUnlocked()
                 } else {
-                    scope.launch {
-                        shakeOffset.animateTo(
-                            targetValue = 0f,
-                            animationSpec = keyframes {
-                                durationMillis = 400
-                                -20f at 50
-                                20f at 100
-                                -15f at 150
-                                15f at 200
-                                -10f at 250
-                                10f at 300
-                                0f at 400
-                            },
-                        )
-                        enteredPin = ""
-                    }
+                    val newState = PinAttemptPolicy.afterFailure(
+                        PinAttemptState(effectiveAttempts, lockedUntilMillis),
+                        System.currentTimeMillis(),
+                    )
+                    hasWrongAttempt = true
+                    onAttemptStateChanged(newState.failedAttempts, newState.lockedUntilMillis)
+                    shakeOffset.animateTo(
+                        targetValue = 0f,
+                        animationSpec = keyframes {
+                            durationMillis = 400
+                            -20f at 50
+                            20f at 100
+                            -15f at 150
+                            15f at 200
+                            -10f at 250
+                            10f at 300
+                            0f at 400
+                        },
+                    )
+                    enteredPin = ""
                 }
             }
         }
@@ -117,7 +155,10 @@ fun AppLockScreen(
     fun onBiometricClick() {
         SecurityManager.showBiometricPrompt(
             context = context,
-            onSuccess = onUnlocked,
+            onSuccess = {
+                onAttemptStateChanged(0, 0L)
+                onUnlocked()
+            },
             onError = {},
         )
     }
@@ -187,6 +228,30 @@ fun AppLockScreen(
                         )
                     }
                 }
+
+                when {
+                    isLocked -> Text(
+                        text = "تلاش بیش از حد. " +
+                            Digits.toPersian(((remainingLockMillis + 999) / 1_000).toString()) +
+                            " ثانیه صبر کنید.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                    hasWrongAttempt -> {
+                        val remaining = (PinAttemptPolicy.MAX_ATTEMPTS - effectiveAttempts).coerceAtLeast(0)
+                        Text(
+                            text = if (remaining > 0) {
+                                "رمز اشتباه است. " + Digits.toPersian(remaining.toString()) + " تلاش باقی مانده."
+                            } else {
+                                "رمز اشتباه است."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
 
             // Keypad
@@ -210,6 +275,7 @@ fun AppLockScreen(
                             KeypadButton(
                                 text = Digits.toPersian(digit.toString()),
                                 onClick = { onDigit(digit) },
+                                enabled = !isLocked,
                             )
                         }
                     }
@@ -245,6 +311,7 @@ fun AppLockScreen(
                     KeypadButton(
                         text = Digits.toPersian("0"),
                         onClick = { onDigit(0) },
+                        enabled = !isLocked,
                     )
 
                     // Backspace button
@@ -252,7 +319,7 @@ fun AppLockScreen(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(CircleShape)
-                            .clickable { onBackspace() },
+                            .clickable(enabled = !isLocked) { onBackspace() },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -273,6 +340,7 @@ private fun KeypadButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val lumina = LocalHesabiLumina.current
 
@@ -282,12 +350,18 @@ private fun KeypadButton(
         shape = CircleShape,
         color = lumina.glassBackground,
         border = BorderStroke(1.dp, lumina.glassBorder),
+        enabled = enabled,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                },
             )
         }
     }

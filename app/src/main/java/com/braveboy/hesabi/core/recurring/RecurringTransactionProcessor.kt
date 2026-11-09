@@ -6,6 +6,8 @@ import com.braveboy.hesabi.domain.model.Transaction
 import com.braveboy.hesabi.domain.model.TransactionSource
 import com.braveboy.hesabi.domain.repository.RecurringTransactionRepository
 import com.braveboy.hesabi.domain.repository.TransactionRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 class RecurringTransactionProcessor(
@@ -13,32 +15,67 @@ class RecurringTransactionProcessor(
     private val transactionRepo: TransactionRepository,
 ) {
 
+    /** Serializes processing so the app start and the worker can never double-post. */
+    private val mutex = Mutex()
+
     /**
-     * Finds active recurring transactions with nextOccurrenceEpochDay <= todayEpochDay.
-     * For each, if autoApply is true:
-     *   1. Creates a Transaction in transactionRepo.
-     *   2. Advances nextOccurrenceEpochDay via RecurringFrequencyCalculator.
-     *   3. Updates the recurring item in recurringRepo.
-     * Returns the count of applied transactions.
+     * Posts every missed occurrence of every due item, using the occurrence date
+     * (not today) for the transaction. Re-running is safe because each occurrence
+     * carries a unique [externalRef].
      */
-    suspend fun processDueTransactions(todayEpochDay: Long): Int {
+    suspend fun processDueTransactions(todayEpochDay: Long): Int = mutex.withLock {
         val dueList = recurringRepo.getDue(todayEpochDay)
         var appliedCount = 0
 
         for (recurring in dueList) {
-            if (recurring.autoApply) {
-                applyRecurringTransaction(recurring, todayEpochDay)
-                appliedCount++
+            if (!recurring.autoApply) continue
+            var occurrence = recurring.nextOccurrenceEpochDay
+            var guard = 0
+            while (occurrence <= todayEpochDay && guard < MAX_CATCH_UP) {
+                if (postOccurrence(recurring, occurrence)) appliedCount++
+                val next = RecurringFrequencyCalculator.computeNextOccurrence(
+                    currentEpochDay = occurrence,
+                    frequency = recurring.frequency,
+                    interval = recurring.interval,
+                    dayOfMonth = recurring.dayOfMonth,
+                )
+                recurringRepo.updateOccurrence(recurring.id, occurrence, next)
+                occurrence = next
+                guard++
             }
         }
-        return appliedCount
+        appliedCount
     }
 
     /**
-     * Manually or automatically applies a recurring transaction for the specified epochDay,
-     * creating the corresponding financial transaction and advancing its next occurrence.
+     * Manually applies an item for [applyEpochDay]. The schedule only advances when
+     * the item was actually due, so applying early does not skip the next occurrence.
      */
-    suspend fun applyRecurringTransaction(recurring: RecurringTransaction, applyEpochDay: Long) {
+    suspend fun applyRecurringTransaction(
+        recurring: RecurringTransaction,
+        applyEpochDay: Long,
+    ) = mutex.withLock {
+        if (!postOccurrence(recurring, applyEpochDay)) return@withLock
+        val next = if (recurring.nextOccurrenceEpochDay <= applyEpochDay) {
+            RecurringFrequencyCalculator.computeNextOccurrence(
+                currentEpochDay = recurring.nextOccurrenceEpochDay,
+                frequency = recurring.frequency,
+                interval = recurring.interval,
+                dayOfMonth = recurring.dayOfMonth,
+            )
+        } else {
+            recurring.nextOccurrenceEpochDay
+        }
+        recurringRepo.updateOccurrence(recurring.id, applyEpochDay, next)
+    }
+
+    private suspend fun postOccurrence(
+        recurring: RecurringTransaction,
+        occurrenceEpochDay: Long,
+    ): Boolean {
+        val ref = externalRef(recurring.id, occurrenceEpochDay)
+        if (transactionRepo.findByExternalRef(ref) != null) return false
+
         val transaction = Transaction(
             id = UUID.randomUUID().toString(),
             type = recurring.type,
@@ -46,19 +83,21 @@ class RecurringTransactionProcessor(
             accountId = recurring.accountId,
             toAccountId = recurring.toAccountId,
             categoryId = recurring.categoryId,
-            occurredOnEpochDay = applyEpochDay,
+            occurredOnEpochDay = occurrenceEpochDay,
             note = recurring.note.ifBlank { recurring.title },
             source = TransactionSource.RECURRING,
+            externalRef = ref,
             createdAtMillis = System.currentTimeMillis(),
         )
         transactionRepo.save(transaction)
+        return true
+    }
 
-        val nextOccurrence = RecurringFrequencyCalculator.computeNextOccurrence(
-            currentEpochDay = recurring.nextOccurrenceEpochDay,
-            frequency = recurring.frequency,
-            interval = recurring.interval,
-            dayOfMonth = recurring.dayOfMonth,
-        )
-        recurringRepo.updateOccurrence(recurring.id, applyEpochDay, nextOccurrence)
+    companion object {
+        /** Safety valve so a long-abandoned daily item cannot loop forever. */
+        private const val MAX_CATCH_UP = 400
+
+        fun externalRef(recurringId: String, occurrenceEpochDay: Long): String =
+            "recurring:$recurringId:$occurrenceEpochDay"
     }
 }

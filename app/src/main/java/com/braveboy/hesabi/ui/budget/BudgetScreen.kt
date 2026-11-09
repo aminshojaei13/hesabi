@@ -40,6 +40,8 @@ import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.MonthSwitcher
 import com.braveboy.hesabi.ui.components.SectionHeader
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Icon
 import com.braveboy.hesabi.ui.components.categoryIcon
 import com.braveboy.hesabi.ui.hesabiViewModel
 import com.braveboy.hesabi.ui.preview.PreviewData
@@ -65,6 +67,8 @@ fun BudgetScreen(
         onCurrentMonth = viewModel::currentMonth,
         onEditOverall = { editOverall = true },
         onEditCategory = { editCategory = it },
+        onToggleRollover = viewModel::toggleRollover,
+        onToggleOverallRollover = viewModel::toggleOverallRollover,
         modifier = modifier,
     )
 
@@ -73,8 +77,8 @@ fun BudgetScreen(
             title = "بودجهٔ کل ${state.period.label}",
             initial = state.overallBudget,
             onDismiss = { editOverall = false },
-            onSave = { amount ->
-                viewModel.saveOverall(amount)
+            onSave = { amount, rollover ->
+                viewModel.saveOverall(amount, rollover)
                 editOverall = false
             },
             onRemove = state.overallBudget?.let {
@@ -91,8 +95,8 @@ fun BudgetScreen(
             title = "بودجهٔ ${line.category.name}",
             initial = line.budget,
             onDismiss = { editCategory = null },
-            onSave = { amount ->
-                viewModel.saveCategory(line.category.id, amount)
+            onSave = { amount, rollover ->
+                viewModel.saveCategory(line.category.id, amount, rollover)
                 editCategory = null
             },
             onRemove = line.budget?.let {
@@ -114,6 +118,8 @@ fun BudgetContent(
     onCurrentMonth: () -> Unit,
     onEditOverall: () -> Unit,
     onEditCategory: (BudgetLine) -> Unit,
+    onToggleRollover: (String) -> Unit = {},
+    onToggleOverallRollover: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val withBudget = state.lines.filter { it.budget != null }
@@ -143,10 +149,34 @@ fun BudgetContent(
         item {
             BudgetProgressCard(
                 spentToman = state.overallSpentToman,
-                limitToman = state.overallBudget?.limitToman,
+                limitToman = state.overallEnvelope?.availableToman ?: state.overallBudget?.limitToman,
                 title = "بودجهٔ کل ماه",
                 onEdit = onEditOverall,
             )
+            val overallCarry = state.overallEnvelope?.carriedOverToman ?: 0L
+            if (overallCarry > 0) {
+                Text(
+                    text = "ماندهٔ منتقل‌شده از ماه قبل: " + Money.format(overallCarry),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (state.overallBudget != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "انتقال ماندهٔ بودجه به ماه بعد",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Switch(
+                        checked = state.overallBudget.rolloverEnabled,
+                        onCheckedChange = { onToggleOverallRollover() },
+                    )
+                }
+            }
         }
         item {
             InfoBanner(
@@ -156,13 +186,21 @@ fun BudgetContent(
         if (withBudget.isNotEmpty()) {
             item { SectionHeader("بودجهٔ دسته‌ها") }
             items(withBudget, key = { it.category.id }) { line ->
-                CategoryBudgetCard(line = line, onClick = { onEditCategory(line) })
+                CategoryBudgetCard(
+                    line = line,
+                    onClick = { onEditCategory(line) },
+                    onToggleRollover = { onToggleRollover(line.category.id) },
+                )
             }
         }
         if (withoutBudget.isNotEmpty()) {
             item { SectionHeader("بدون بودجه") }
             items(withoutBudget, key = { "no-${it.category.id}" }) { line ->
-                CategoryBudgetCard(line = line, onClick = { onEditCategory(line) })
+                CategoryBudgetCard(
+                    line = line,
+                    onClick = { onEditCategory(line) },
+                    onToggleRollover = { onToggleRollover(line.category.id) },
+                )
             }
         }
         item {
@@ -176,7 +214,11 @@ fun BudgetContent(
 }
 
 @Composable
-private fun CategoryBudgetCard(line: BudgetLine, onClick: () -> Unit) {
+private fun CategoryBudgetCard(
+    line: BudgetLine,
+    onClick: () -> Unit,
+    onToggleRollover: () -> Unit = {},
+) {
     val color = Color(line.category.colorArgb)
     val budget = line.budget
     HesabiCard(onClick = onClick, contentPadding = PaddingValues(HesabiSpacing.md)) {
@@ -201,9 +243,28 @@ private fun CategoryBudgetCard(line: BudgetLine, onClick: () -> Unit) {
             BudgetRow(
                 title = "",
                 spentToman = line.spentToman,
-                limitToman = budget.limitToman,
+                limitToman = line.envelope?.availableToman ?: budget.limitToman,
                 color = color,
             )
+            line.envelope?.carriedOverToman?.takeIf { it > 0 }?.let { carry ->
+                Text(
+                    text = "انتقال از ماه قبل: " + Money.format(carry),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "انتقال مانده به ماه بعد",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Switch(checked = budget.rolloverEnabled, onCheckedChange = { onToggleRollover() })
+            }
         }
     }
 }
@@ -213,7 +274,7 @@ private fun BudgetEditorDialog(
     title: String,
     initial: Budget?,
     onDismiss: () -> Unit,
-    onSave: (Long) -> Unit,
+    onSave: (Long, Boolean) -> Unit,
     onRemove: (() -> Unit)?,
 ) {
     var text by remember {
@@ -221,6 +282,7 @@ private fun BudgetEditorDialog(
             initial?.limitToman?.takeIf { it > 0 }?.let { Money.format(it, withUnit = false) }.orEmpty(),
         )
     }
+    var rolloverEnabled by remember { mutableStateOf(initial?.rolloverEnabled ?: false) }
     val parsed = Money.parseToman(text)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -239,11 +301,25 @@ private fun BudgetEditorDialog(
                     placeholder = "۵٬۰۰۰٬۰۰۰",
                     error = if (text.isNotBlank() && parsed == null) "مبلغ قابل خواندن نیست." else null,
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "انتقال ماندهٔ مصرف‌نشده به ماه بعد",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Switch(
+                        checked = rolloverEnabled,
+                        onCheckedChange = { rolloverEnabled = it },
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(parsed ?: 0L) },
+                onClick = { onSave(parsed ?: 0L, rolloverEnabled) },
                 enabled = text.isBlank() || parsed != null,
             ) { Text(if (text.isBlank()) "حذف بودجه" else "ذخیره") }
         },

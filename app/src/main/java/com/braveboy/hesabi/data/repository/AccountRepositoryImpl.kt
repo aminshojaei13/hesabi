@@ -22,20 +22,30 @@ class AccountRepositoryImpl(
 
     override fun observeWithBalances(): Flow<List<AccountWithBalance>> =
         combine(accountDao.observeAll(), transactionDao.observeAll()) { accounts, transactions ->
-            accounts.map { entity ->
-                val account = entity.toDomain()
-                var balance = account.openingBalanceToman
-                for (tx in transactions) {
-                    when (tx.type) {
-                        TransactionType.INCOME.name -> if (tx.accountId == account.id) balance += tx.amountToman
-                        TransactionType.EXPENSE.name -> if (tx.accountId == account.id) balance -= tx.amountToman
-                        TransactionType.TRANSFER.name -> {
-                            if (tx.accountId == account.id) balance -= tx.amountToman
-                            if (tx.toAccountId == account.id) balance += tx.amountToman
+            // One pass over transactions, then one lookup per account: O(n + m) instead
+            // of scanning every transaction once per account (M9).
+            val deltas = HashMap<String, Long>(accounts.size * 2)
+            for (tx in transactions) {
+                when (tx.type) {
+                    TransactionType.INCOME.name ->
+                        deltas[tx.accountId] = (deltas[tx.accountId] ?: 0L) + tx.amountToman
+                    TransactionType.EXPENSE.name ->
+                        deltas[tx.accountId] = (deltas[tx.accountId] ?: 0L) - tx.amountToman
+                    TransactionType.TRANSFER.name -> {
+                        deltas[tx.accountId] = (deltas[tx.accountId] ?: 0L) - tx.amountToman
+                        val destination = tx.toAccountId
+                        if (destination != null) {
+                            deltas[destination] = (deltas[destination] ?: 0L) + tx.amountToman
                         }
                     }
                 }
-                AccountWithBalance(account = account, balanceToman = balance)
+            }
+            accounts.map { entity ->
+                val account = entity.toDomain()
+                AccountWithBalance(
+                    account = account,
+                    balanceToman = account.openingBalanceToman + (deltas[account.id] ?: 0L),
+                )
             }
         }
 

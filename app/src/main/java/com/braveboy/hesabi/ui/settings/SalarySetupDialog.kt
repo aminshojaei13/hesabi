@@ -3,6 +3,8 @@ package com.braveboy.hesabi.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -57,7 +59,7 @@ fun SalarySetupDialog(
     var selectedAccountId by remember { mutableStateOf(initialAccountId ?: accounts.firstOrNull()?.id) }
     var autoDeposit by remember { mutableStateOf(initialAutoDeposit) }
 
-    val parsedSalary = Digits.toAscii(salaryText).filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val parsedSalary = Money.parseToman(salaryText) ?: 0L
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         AlertDialog(
@@ -90,6 +92,11 @@ fun SalarySetupDialog(
                         placeholder = "مثلاً ۲۵,۰۰۰,۰۰۰",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
+                        error = if (salaryText.isNotBlank() && parsedSalary <= 0) {
+                            "مبلغ حقوق را معتبر وارد کن یا خالی بگذار."
+                        } else {
+                            null
+                        },
                     )
                     if (parsedSalary > 0) {
                         Text(
@@ -102,16 +109,12 @@ fun SalarySetupDialog(
 
                     // Payday Selection
                     Text("روز دریافت حقوق در ماه:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                    val commonDays = listOf(1, 20, 25, 26, 28, 30)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        commonDays.forEach { d ->
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items((1..31).toList()) { d ->
                             FilterChip(
                                 selected = payday == d,
                                 onClick = { payday = d },
-                                label = { Text(if (d == 1) "یکم" else "${Digits.toPersian(d.toString())}") },
+                                label = { Text(if (d == 1) "یکم" else Digits.toPersian(d.toString())) },
                             )
                         }
                     }
@@ -119,11 +122,8 @@ fun SalarySetupDialog(
                     // Salary Target Account
                     if (accounts.isNotEmpty()) {
                         Text("حساب واریز حقوق:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            accounts.take(3).forEach { acc ->
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(accounts, key = { it.id }) { acc ->
                                 FilterChip(
                                     selected = selectedAccountId == acc.id,
                                     onClick = { selectedAccountId = acc.id },
@@ -163,6 +163,7 @@ fun SalarySetupDialog(
                     onClick = {
                         onSave(parsedSalary, payday, selectedAccountId, autoDeposit)
                     },
+                    enabled = salaryText.isBlank() || parsedSalary > 0,
                 )
             },
             dismissButton = {

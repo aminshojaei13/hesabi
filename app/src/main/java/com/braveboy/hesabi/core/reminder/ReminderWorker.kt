@@ -13,6 +13,7 @@ import com.braveboy.hesabi.HesabiApp
 import com.braveboy.hesabi.MainActivity
 import com.braveboy.hesabi.R
 import com.braveboy.hesabi.core.date.JalaliDate
+import com.braveboy.hesabi.core.notifications.NotificationChannels
 import com.braveboy.hesabi.core.money.Money
 import com.braveboy.hesabi.domain.model.ChequeStatus
 
@@ -28,15 +29,21 @@ class ReminderWorker(
         val today = JalaliDate.today().toEpochDay()
 
         // Automatically process due recurring transactions and salary auto-deposit if enabled
-        runCatching {
+        val maintenance = runCatching {
             container.recurringTransactionProcessor.processDueTransactions(today)
             container.processSalaryAutoDeposit(today)
+            container.purgeExpiredTrash()
+        }
+        if (maintenance.isFailure) {
+            // Transient DB/lock problems retry with backoff instead of silently skipping
+            // the whole reminder round (M21).
+            return Result.retry()
         }
 
         val settings = container.settingsRepository.current()
         if (!settings.remindersEnabled) return Result.success()
 
-        createNotificationChannel()
+        NotificationChannels.ensure(context)
 
         val dueWindowCheques = today + 2
         val dueWindowInstallments = today + 3
@@ -87,19 +94,6 @@ class ReminderWorker(
         return Result.success()
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "یادآورهای مالی حسابی"
-            val descriptionText = "اعلان‌های یادآوری سررسید چک‌ها و اقساط وام"
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-            }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
     private fun sendNotification(id: Int, title: String, body: String) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -112,7 +106,7 @@ class ReminderWorker(
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -126,7 +120,7 @@ class ReminderWorker(
     }
 
     companion object {
-        const val CHANNEL_ID = "hesabi_reminders_channel"
+        const val CHANNEL_ID = NotificationChannels.REMINDERS
         const val WORK_NAME = "hesabi_reminders_periodic_work"
     }
 }

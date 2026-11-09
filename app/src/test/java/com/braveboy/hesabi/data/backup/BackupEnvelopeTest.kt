@@ -16,7 +16,7 @@ class BackupEnvelopeTest {
     }
 
     @Test
-    fun `backup envelope v5 roundtrip preserves all room v5 entities`() {
+    fun `backup envelope v6 roundtrip preserves all room v6 entities`() {
         val original = BackupEnvelope(
             appVersion = "1.0.0",
             exportedAtMillis = 1700000000000L,
@@ -154,11 +154,11 @@ class BackupEnvelopeTest {
 
         val serialized = json.encodeToString(original)
         assertTrue(serialized.contains("hesabi-backup"))
-        assertTrue(serialized.contains("\"schema\":5"))
+        assertTrue(serialized.contains("\"schema\":6"))
 
         val restored = json.decodeFromString<BackupEnvelope>(serialized)
         assertEquals(BackupEnvelope.MAGIC, restored.magic)
-        assertEquals(5, restored.schema)
+        assertEquals(6, restored.schema)
         assertEquals(1, restored.accounts.size)
         assertEquals("بانک ملی", restored.accounts[0].name)
         assertEquals(1, restored.categories.size)
@@ -175,6 +175,61 @@ class BackupEnvelopeTest {
         assertEquals(1, restored.installments.size)
         assertEquals(1, restored.recurringTransactions.size)
         assertEquals("اشتراک اینترنت", restored.recurringTransactions[0].title)
+        assertEquals(false, restored.budgets[0].rolloverEnabled)
+        assertEquals(0L, restored.savingsGoals[0].monthlyTargetToman)
+    }
+
+    @Test
+    fun `v6 backup carries receipts quick templates assets sms and settings`() {
+        val envelope = BackupEnvelope(
+            appVersion = "1.0.0",
+            exportedAtMillis = 1700000000000L,
+            accounts = listOf(
+                AccountDto("a", "نقدی", "CASH", 0, 0),
+            ),
+            receipts = listOf(ReceiptDto(path = "/x.hsr", base64 = "AAAA")),
+            quickTemplates = listOf(
+                QuickTemplateDto(id = "q", label = "قهوه", type = "EXPENSE", amountToman = 120_000),
+            ),
+            assets = listOf(
+                AssetDto(
+                    id = "as",
+                    name = "سکه",
+                    kind = "GOLD",
+                    quantityMilli = 1000,
+                    unitLabel = "عدد",
+                    buyPriceTomanPerUnit = 50_000_000,
+                    currentPriceTomanPerUnit = 55_000_000,
+                ),
+            ),
+            assetPriceSnapshots = listOf(
+                AssetPriceSnapshotDto(id = "s", assetId = "as", priceTomanPerUnit = 1, recordedAtMillis = 2),
+            ),
+            savingsDeposits = listOf(
+                SavingsDepositDto(id = "d", goalId = "g", amountToman = 1000, occurredOnEpochDay = 19700),
+            ),
+            smsEvents = listOf(
+                SmsEventDto(
+                    id = "sms",
+                    sender = "BANK",
+                    body = "خرید",
+                    receivedAtMillis = 1,
+                    rawHash = "h",
+                    occurredOnEpochDay = 19700,
+                ),
+            ),
+            senderRules = listOf(SenderRuleDto(sender = "BANK", ignored = true)),
+            settings = SettingsDto(aiMode = "LOCAL", paydayDayOfMonth = 25),
+        )
+        val serialized = json.encodeToString(envelope)
+        val restored = json.decodeFromString<BackupEnvelope>(serialized)
+        assertEquals(1, restored.receipts.size)
+        assertEquals("قهوه", restored.quickTemplates[0].label)
+        assertEquals("GOLD", restored.assets[0].kind)
+        assertEquals(1, restored.assetPriceSnapshots.size)
+        assertEquals(1, restored.savingsDeposits.size)
+        assertEquals("BANK", restored.smsEvents[0].sender)
+        assertEquals(25, restored.settings?.paydayDayOfMonth)
     }
 
     @Test

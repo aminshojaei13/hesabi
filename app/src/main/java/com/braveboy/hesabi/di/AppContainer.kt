@@ -7,27 +7,36 @@ import com.braveboy.hesabi.BuildConfig
 import com.braveboy.hesabi.data.backup.BackupManager
 import com.braveboy.hesabi.data.local.HesabiDatabase
 import com.braveboy.hesabi.data.repository.AccountRepositoryImpl
+import com.braveboy.hesabi.data.repository.AssetRepositoryImpl
 import com.braveboy.hesabi.data.repository.BudgetRepositoryImpl
 import com.braveboy.hesabi.data.repository.CategoryRepositoryImpl
+import com.braveboy.hesabi.data.repository.DiagnosticsRepositoryImpl
 import com.braveboy.hesabi.data.repository.ChequeRepositoryImpl
 import com.braveboy.hesabi.data.repository.DebtRepositoryImpl
 import com.braveboy.hesabi.data.repository.LoanRepositoryImpl
 import com.braveboy.hesabi.data.repository.PersonRepositoryImpl
+import com.braveboy.hesabi.data.repository.QuickTemplateRepositoryImpl
 import com.braveboy.hesabi.data.repository.RecurringTransactionRepositoryImpl
 import com.braveboy.hesabi.data.repository.SavingsGoalRepositoryImpl
 import com.braveboy.hesabi.data.repository.SettingsRepositoryImpl
 import com.braveboy.hesabi.data.repository.SmsRepositoryImpl
 import com.braveboy.hesabi.data.repository.TransactionRepositoryImpl
+import com.braveboy.hesabi.core.receipt.ReceiptStorageManager
+import com.braveboy.hesabi.domain.logic.SalarySchedule
 import com.braveboy.hesabi.data.seed.SeedData
+import com.braveboy.hesabi.data.local.toDomain
 import com.braveboy.hesabi.data.local.toEntity
 import com.braveboy.hesabi.domain.repository.AccountRepository
+import com.braveboy.hesabi.domain.repository.AssetRepository
 import com.braveboy.hesabi.domain.repository.BackupRepository
 import com.braveboy.hesabi.domain.repository.BudgetRepository
 import com.braveboy.hesabi.domain.repository.CategoryRepository
+import com.braveboy.hesabi.domain.repository.DiagnosticsRepository
 import com.braveboy.hesabi.domain.repository.ChequeRepository
 import com.braveboy.hesabi.domain.repository.DebtRepository
 import com.braveboy.hesabi.domain.repository.LoanRepository
 import com.braveboy.hesabi.domain.repository.PersonRepository
+import com.braveboy.hesabi.domain.repository.QuickTemplateRepository
 import com.braveboy.hesabi.domain.repository.RecurringTransactionRepository
 import com.braveboy.hesabi.domain.repository.SavingsGoalRepository
 import com.braveboy.hesabi.domain.repository.SettingsRepository
@@ -47,8 +56,7 @@ class AppContainer(context: Context) {
         HesabiDatabase::class.java,
         HesabiDatabase.NAME,
     )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-        .fallbackToDestructiveMigration(dropAllTables = false)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .build()
 
     val settingsRepository: SettingsRepository = SettingsRepositoryImpl(appContext)
@@ -56,7 +64,11 @@ class AppContainer(context: Context) {
     val categoryRepository: CategoryRepository = CategoryRepositoryImpl(database.categoryDao())
     val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database.transactionDao())
     val budgetRepository: BudgetRepository = BudgetRepositoryImpl(database.budgetDao())
-    val savingsGoalRepository: SavingsGoalRepository = SavingsGoalRepositoryImpl(database.savingsGoalDao())
+    val savingsGoalRepository: SavingsGoalRepository =
+        SavingsGoalRepositoryImpl(database.savingsGoalDao(), database.savingsDepositDao())
+    val quickTemplateRepository: QuickTemplateRepository = QuickTemplateRepositoryImpl(database.quickTemplateDao())
+    val assetRepository: AssetRepository = AssetRepositoryImpl(database.assetDao(), database.assetPriceSnapshotDao())
+    val diagnosticsRepository: DiagnosticsRepository = DiagnosticsRepositoryImpl(database.appEventDao())
     val personRepository: PersonRepository = PersonRepositoryImpl(database.personDao(), database.debtDao())
     val debtRepository: DebtRepository = DebtRepositoryImpl(database.debtDao())
     val chequeRepository: ChequeRepository = ChequeRepositoryImpl(database.chequeDao())
@@ -72,6 +84,7 @@ class AppContainer(context: Context) {
         settingsRepository = settingsRepository,
     )
     val backupRepository: BackupRepository = BackupManager(
+        appContext = appContext,
         db = database,
         accountDao = database.accountDao(),
         categoryDao = database.categoryDao(),
@@ -84,6 +97,12 @@ class AppContainer(context: Context) {
         loanDao = database.loanDao(),
         installmentDao = database.installmentDao(),
         recurringTransactionDao = database.recurringTransactionDao(),
+        savingsDepositDao = database.savingsDepositDao(),
+        quickTemplateDao = database.quickTemplateDao(),
+        assetDao = database.assetDao(),
+        assetPriceSnapshotDao = database.assetPriceSnapshotDao(),
+        smsDao = database.smsDao(),
+        senderRuleDao = database.senderRuleDao(),
         settingsRepository = settingsRepository,
         appVersion = BuildConfig.VERSION_NAME,
     )
@@ -97,6 +116,9 @@ class AppContainer(context: Context) {
         if (database.categoryDao().count() == 0) {
             database.categoryDao().upsertAll(SeedData.categories.map { it.toEntity() })
         }
+        if (database.quickTemplateDao().getAll().isEmpty()) {
+            database.quickTemplateDao().upsertAll(SeedData.quickTemplates.map { it.toEntity() })
+        }
         if (settingsRepository.current().defaultAccountId == null) {
             val first = database.accountDao().getAll().firstOrNull()
             if (first != null) settingsRepository.setDefaultAccountId(first.id)
@@ -104,8 +126,11 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Checks if today is payday and user has configured auto-deposit for monthly salary.
-     * If so and salary hasn't been deposited today yet, inserts an income transaction.
+     * Deposits the monthly salary for every due month that has not been posted yet.
+     *
+     * The effective payday is `min(configuredDay, daysInMonth)`, so a payday of 31
+     * still runs in 30-day (and 29-day) months. Each month is keyed by
+     * `salary:<year-month>` so a second run never duplicates it.
      */
     suspend fun processSalaryAutoDeposit(
         todayEpochDay: Long = com.braveboy.hesabi.core.date.JalaliDate.today().toEpochDay(),
@@ -113,13 +138,29 @@ class AppContainer(context: Context) {
         val settings = settingsRepository.current()
         if (!settings.autoDepositSalary || settings.monthlySalaryToman <= 0) return@withContext
 
-        val todayJalali = com.braveboy.hesabi.core.date.JalaliDate.fromEpochDay(todayEpochDay)
+        val today = com.braveboy.hesabi.core.date.JalaliDate.fromEpochDay(todayEpochDay)
         val paydayDay = settings.paydayDayOfMonth.coerceIn(1, 31)
-        if (todayJalali.day != paydayDay) return@withContext
+        val currentMonth = com.braveboy.hesabi.core.date.MonthPeriod.of(today)
+        val lastDueMonth = SalarySchedule.lastDueMonth(today, paydayDay)
 
-        val existingToday = database.transactionDao().getAll().filter { it.occurredOnEpochDay == todayEpochDay }
-        val salaryAlreadyDeposited = existingToday.any { it.note.contains("حقوق ماهانه") }
-        if (salaryAlreadyDeposited) return@withContext
+        val allTransactions = database.transactionDao().getAll().map { it.toDomain() }
+        val depositedMonths = allTransactions.mapNotNull { transaction ->
+            val ref = transaction.externalRef ?: return@mapNotNull null
+            if (!ref.startsWith(SALARY_REF_PREFIX)) return@mapNotNull null
+            com.braveboy.hesabi.core.date.MonthPeriod.fromKey(ref.removePrefix(SALARY_REF_PREFIX))
+        }
+        // Rows created before the unique key existed still count as a deposit month.
+        val legacyMonths = allTransactions
+            .filter {
+                it.externalRef == null &&
+                    it.type == com.braveboy.hesabi.domain.model.TransactionType.INCOME &&
+                    it.note.contains("حقوق ماهانه")
+            }
+            .map { com.braveboy.hesabi.core.date.MonthPeriod.of(it.occurredOn) }
+        val lastDepositedMonth = (depositedMonths + legacyMonths).maxByOrNull { it.year * 12 + it.month }
+
+        val dueMonths = SalarySchedule.dueMonths(today, paydayDay, lastDepositedMonth)
+        if (dueMonths.isEmpty()) return@withContext
 
         val targetAccountId = settings.salaryAccountId
             ?: settings.defaultAccountId
@@ -130,18 +171,60 @@ class AppContainer(context: Context) {
         val salaryCategory = categories.firstOrNull { it.kind == "INCOME" && (it.name.contains("حقوق") || it.name.contains("درآمد")) }
             ?: categories.firstOrNull { it.kind == "INCOME" }
 
-        val transaction = com.braveboy.hesabi.domain.model.Transaction(
-            id = java.util.UUID.randomUUID().toString(),
-            type = com.braveboy.hesabi.domain.model.TransactionType.INCOME,
-            amountToman = settings.monthlySalaryToman,
-            accountId = targetAccountId,
-            categoryId = salaryCategory?.id,
-            occurredOnEpochDay = todayEpochDay,
-            note = "حقوق ماهانه (ثبت خودکار)",
-            source = com.braveboy.hesabi.domain.model.TransactionSource.MANUAL,
-            createdAtMillis = System.currentTimeMillis(),
-        )
-        transactionRepository.save(transaction)
+        for (month in dueMonths) {
+            val ref = SALARY_REF_PREFIX + month.key
+            if (transactionRepository.findByExternalRef(ref) != null) continue
+
+            // Backfill the key on salary rows created by older versions.
+            val legacy = allTransactions.firstOrNull { transaction ->
+                transaction.externalRef == null &&
+                    transaction.type == com.braveboy.hesabi.domain.model.TransactionType.INCOME &&
+                    transaction.note.contains("حقوق ماهانه") &&
+                    com.braveboy.hesabi.core.date.MonthPeriod.of(transaction.occurredOn) == month
+            }
+            if (legacy != null) {
+                transactionRepository.save(legacy.copy(externalRef = ref))
+                continue
+            }
+
+            val dueEpochDay = com.braveboy.hesabi.core.date.JalaliDate(
+                month.year,
+                month.month,
+                paydayDay.coerceAtMost(month.days),
+            ).toEpochDay()
+            val transaction = com.braveboy.hesabi.domain.model.Transaction(
+                id = java.util.UUID.randomUUID().toString(),
+                type = com.braveboy.hesabi.domain.model.TransactionType.INCOME,
+                amountToman = settings.monthlySalaryToman,
+                accountId = targetAccountId,
+                categoryId = salaryCategory?.id,
+                occurredOnEpochDay = dueEpochDay,
+                note = "حقوق ماهانه (ثبت خودکار)",
+                source = com.braveboy.hesabi.domain.model.TransactionSource.MANUAL,
+                externalRef = ref,
+                createdAtMillis = System.currentTimeMillis(),
+            )
+            transactionRepository.save(transaction)
+        }
+    }
+
+    /**
+     * Deletes recycle-bin rows older than 30 days, their encrypted receipts, and any
+     * orphan image left behind by an interrupted save.
+     */
+    suspend fun purgeExpiredTrash() = withContext(Dispatchers.IO) {
+        runCatching {
+            val cutoff = System.currentTimeMillis() - TRASH_RETENTION_MILLIS
+            val expired = database.transactionDao().getAllIncludingDeleted()
+                .filter { it.deletedAtMillis != null && it.deletedAtMillis < cutoff }
+            expired.forEach { ReceiptStorageManager.deleteReceiptFile(it.receiptImagePath) }
+            transactionRepository.purgeTrash(cutoff)
+
+            val referenced = database.transactionDao().getAllIncludingDeleted()
+                .mapNotNull { it.receiptImagePath }
+                .toSet()
+            ReceiptStorageManager.deleteOrphaned(appContext, referenced)
+        }
     }
 
     /** Removes every user row, then restores the minimal defaults. Settings are reset too. */
@@ -158,6 +241,11 @@ class AppContainer(context: Context) {
             database.savingsGoalDao().deleteAll()
             database.smsDao().deleteAll()
             database.senderRuleDao().deleteAll()
+            database.quickTemplateDao().deleteAll()
+            database.assetPriceSnapshotDao().deleteAll()
+            database.assetDao().deleteAll()
+            database.savingsDepositDao().deleteAll()
+            database.appEventDao().deleteAll()
             database.categoryDao().deleteAll()
             database.accountDao().deleteAll()
         }
@@ -167,6 +255,9 @@ class AppContainer(context: Context) {
         ensureSeeded()
     }
 }
+
+private const val TRASH_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1000
+private const val SALARY_REF_PREFIX = "salary:"
 
 private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -300,5 +391,95 @@ private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
         """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_isActive` ON `recurring_transactions` (`isActive`)")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_transactions_nextOccurrenceEpochDay` ON `recurring_transactions` (`nextOccurrenceEpochDay`)")
+    }
+}
+
+
+private val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        // Recycle bin, commitment links and quick entries.
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `deletedAtMillis` INTEGER")
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedEntityType` TEXT")
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedEntityId` TEXT")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_deletedAtMillis` ON `transactions` (`deletedAtMillis`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_linkedEntityId` ON `transactions` (`linkedEntityId`)")
+
+        db.execSQL("ALTER TABLE `budgets` ADD COLUMN `rolloverEnabled` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `savings_goals` ADD COLUMN `monthlyTargetToman` INTEGER NOT NULL DEFAULT 0")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `quick_templates` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `label` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `amountToman` INTEGER NOT NULL,
+                `categoryId` TEXT,
+                `accountId` TEXT,
+                `toAccountId` TEXT,
+                `note` TEXT NOT NULL,
+                `usageCount` INTEGER NOT NULL,
+                `sortOrder` INTEGER NOT NULL,
+                `createdAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_quick_templates_type` ON `quick_templates` (`type`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_quick_templates_sortOrder` ON `quick_templates` (`sortOrder`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `assets` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `name` TEXT NOT NULL,
+                `kind` TEXT NOT NULL,
+                `quantityMilli` INTEGER NOT NULL,
+                `unitLabel` TEXT NOT NULL,
+                `buyPriceTomanPerUnit` INTEGER NOT NULL,
+                `currentPriceTomanPerUnit` INTEGER NOT NULL,
+                `priceUpdatedAtMillis` INTEGER NOT NULL,
+                `priceSourceLabel` TEXT NOT NULL,
+                `note` TEXT NOT NULL,
+                `archived` INTEGER NOT NULL,
+                `createdAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_assets_kind` ON `assets` (`kind`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_assets_archived` ON `assets` (`archived`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_assets_createdAtMillis` ON `assets` (`createdAtMillis`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `asset_price_snapshots` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `assetId` TEXT NOT NULL,
+                `priceTomanPerUnit` INTEGER NOT NULL,
+                `recordedAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_asset_price_snapshots_assetId` ON `asset_price_snapshots` (`assetId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_asset_price_snapshots_recordedAtMillis` ON `asset_price_snapshots` (`recordedAtMillis`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `app_events` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `type` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `metadata` TEXT NOT NULL,
+                `occurredAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_app_events_type` ON `app_events` (`type`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_app_events_occurredAtMillis` ON `app_events` (`occurredAtMillis`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `savings_deposits` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `goalId` TEXT NOT NULL,
+                `amountToman` INTEGER NOT NULL,
+                `isWithdrawal` INTEGER NOT NULL,
+                `occurredOnEpochDay` INTEGER NOT NULL,
+                `note` TEXT NOT NULL,
+                `createdAtMillis` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_savings_deposits_goalId` ON `savings_deposits` (`goalId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_savings_deposits_occurredOnEpochDay` ON `savings_deposits` (`occurredOnEpochDay`)")
     }
 }

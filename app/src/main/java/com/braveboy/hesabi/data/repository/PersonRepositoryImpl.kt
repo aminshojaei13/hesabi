@@ -17,7 +17,7 @@ class PersonRepositoryImpl(
 ) : PersonRepository {
 
     override fun observeAll(): Flow<List<Person>> =
-        personDao.observeAll().map { list -> list.map { it.toDomain() } }
+        personDao.observeAll().map { list -> list.map { it.toDomain() }.sortedBy { it.name } }
 
     override fun observeWithDebts(): Flow<List<PersonWithDebts>> =
         combine(personDao.observeAll(), debtDao.observeAll()) { people, debts ->

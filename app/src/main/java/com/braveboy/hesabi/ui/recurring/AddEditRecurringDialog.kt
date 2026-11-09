@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.money.Digits
 import com.braveboy.hesabi.core.money.Money
+import com.braveboy.hesabi.domain.logic.RecurringFrequencyCalculator
 import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.AccountKind
 import com.braveboy.hesabi.domain.model.Category
@@ -79,7 +80,12 @@ fun AddEditRecurringDialog(
     var type by remember { mutableStateOf(initial?.type ?: TransactionType.EXPENSE) }
     var amountText by remember { mutableStateOf(if (initial != null) initial.amountToman.toString() else "") }
     var selectedAccountId by remember { mutableStateOf(initial?.accountId ?: accounts.firstOrNull()?.id.orEmpty()) }
-    var selectedToAccountId by remember { mutableStateOf(initial?.toAccountId ?: accounts.getOrNull(1)?.id) }
+    var selectedToAccountId by remember {
+        mutableStateOf(
+            initial?.toAccountId
+                ?: accounts.firstOrNull { it.id != (initial?.accountId ?: accounts.firstOrNull()?.id) }?.id,
+        )
+    }
     var selectedCategoryId by remember { mutableStateOf(initial?.categoryId) }
     var frequency by remember { mutableStateOf(initial?.frequency ?: RecurringFrequency.MONTHLY) }
     var dayOfMonth by remember { mutableIntStateOf(initial?.dayOfMonth ?: JalaliDate.today().day) }
@@ -87,6 +93,8 @@ fun AddEditRecurringDialog(
     var note by remember { mutableStateOf(initial?.note.orEmpty()) }
 
     val parsedAmount = Digits.toAscii(amountText).filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val destinationValid = type != TransactionType.TRANSFER ||
+        (!selectedToAccountId.isNullOrBlank() && selectedToAccountId != selectedAccountId)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         AlertDialog(
@@ -181,7 +189,12 @@ fun AddEditRecurringDialog(
                         accounts.take(4).forEach { acc ->
                             FilterChip(
                                 selected = selectedAccountId == acc.id,
-                                onClick = { selectedAccountId = acc.id },
+                                onClick = {
+                                    selectedAccountId = acc.id
+                                    if (selectedToAccountId == acc.id) {
+                                        selectedToAccountId = accounts.firstOrNull { it.id != acc.id }?.id
+                                    }
+                                },
                                 label = { Text(acc.name) },
                             )
                         }
@@ -204,6 +217,32 @@ fun AddEditRecurringDialog(
                                         selected = selectedCategoryId == cat.id,
                                         onClick = { selectedCategoryId = cat.id },
                                         label = { Text(cat.name) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Destination account (transfers only)
+                    if (type == TransactionType.TRANSFER) {
+                        val destinationAccounts = accounts.filter { it.id != selectedAccountId }
+                        Text("حساب مقصد:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        if (destinationAccounts.isEmpty()) {
+                            Text(
+                                text = "برای انتقال، حداقل دو حساب لازم است.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.xs),
+                            ) {
+                                destinationAccounts.take(4).forEach { acc ->
+                                    FilterChip(
+                                        selected = selectedToAccountId == acc.id,
+                                        onClick = { selectedToAccountId = acc.id },
+                                        label = { Text(acc.name) },
                                     )
                                 }
                             }
@@ -245,8 +284,14 @@ fun AddEditRecurringDialog(
             confirmButton = {
                 HesabiButton(
                     text = "ذخیره",
+                    enabled = parsedAmount > 0 && destinationValid,
                     onClick = {
-                        val startEpoch = initial?.nextOccurrenceEpochDay ?: JalaliDate.today().toEpochDay()
+                        val today = JalaliDate.today()
+                        val startEpoch = initial?.nextOccurrenceEpochDay ?: if (frequency == RecurringFrequency.MONTHLY) {
+                            RecurringFrequencyCalculator.firstMonthlyOccurrence(today, dayOfMonth)
+                        } else {
+                            today.toEpochDay()
+                        }
                         onSave(
                             title,
                             type,

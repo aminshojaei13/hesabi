@@ -11,11 +11,13 @@ import com.braveboy.hesabi.data.local.toDomain
 import com.braveboy.hesabi.data.local.toEntity
 import com.braveboy.hesabi.data.sms.BankSmsParser
 import com.braveboy.hesabi.data.sms.SmsParseResult
+import com.braveboy.hesabi.data.sms.SmsTextMasker
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
 import com.braveboy.hesabi.domain.model.SmsStatus
 import com.braveboy.hesabi.domain.model.Transaction
 import com.braveboy.hesabi.domain.model.TransactionSource
+import com.braveboy.hesabi.domain.model.TransactionType
 import com.braveboy.hesabi.domain.repository.IngestOutcome
 import com.braveboy.hesabi.domain.repository.SettingsRepository
 import com.braveboy.hesabi.domain.repository.SmsAcceptInput
@@ -63,14 +65,20 @@ class SmsRepositoryImpl(
         return when (parsed) {
             is SmsParseResult.Ignored -> IngestOutcome.Ignored(parsed.reason.name)
             is SmsParseResult.Accepted -> {
-                val hash = Hashing.shortSha256("$sender|$body|${receivedAtMillis / 60_000}")
+                // Same sender + same normalized content inside one 24-hour bucket is a
+                // duplicate. The old 60-second bucket both missed retries and merged
+                // unrelated duplicates (M19).
+                val contentKey = BankSmsParser.normalizeSender(sender) + "|" +
+                    SmsTextMasker.normalizeForHash(body) + "|" + (receivedAtMillis / DAY_MILLIS)
+                val hash = Hashing.shortSha256(contentKey)
                 if (smsDao.findByHash(hash) != null) {
                     return IngestOutcome.Duplicate
                 }
                 val event = SmsEvent(
                     id = UUID.randomUUID().toString(),
                     sender = sender,
-                    body = body,
+                    // Never persist full card/account numbers (M20).
+                    body = SmsTextMasker.mask(body),
                     receivedAtMillis = receivedAtMillis,
                     rawHash = hash,
                     amountToman = parsed.parsed.amountToman,
@@ -108,9 +116,10 @@ class SmsRepositoryImpl(
             var accepted = 0
             for (entry in entries) {
                 if (entry.amountToman <= 0L) continue
-                if (entry.categoryId.isNullOrBlank() &&
-                    entry.type != com.braveboy.hesabi.domain.model.TransactionType.TRANSFER
-                ) {
+                if (entry.type == TransactionType.TRANSFER) {
+                    // A transfer without a distinct destination would make money disappear.
+                    if (entry.toAccountId.isNullOrBlank() || entry.toAccountId == entry.accountId) continue
+                } else if (entry.categoryId.isNullOrBlank()) {
                     continue
                 }
                 val ref = "sms:${entry.eventId}"
@@ -123,6 +132,7 @@ class SmsRepositoryImpl(
                     type = entry.type,
                     amountToman = entry.amountToman,
                     accountId = entry.accountId,
+                    toAccountId = entry.toAccountId.takeIf { entry.type == TransactionType.TRANSFER },
                     categoryId = entry.categoryId,
                     occurredOnEpochDay = entry.occurredOnEpochDay,
                     note = entry.note,
@@ -153,4 +163,8 @@ class SmsRepositoryImpl(
     override suspend fun clearAll() = smsDao.deleteAll()
 
     fun today(): Long = JalaliDate.today().toEpochDay()
+
+    private companion object {
+        const val DAY_MILLIS = 24L * 60 * 60 * 1000
+    }
 }

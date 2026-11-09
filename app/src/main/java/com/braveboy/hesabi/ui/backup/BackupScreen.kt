@@ -39,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.domain.model.BackupSummary
+import com.braveboy.hesabi.domain.repository.BackupImportMode
+import com.braveboy.hesabi.ui.components.FilterChipRow
 import com.braveboy.hesabi.ui.components.ConfirmDialog
 import com.braveboy.hesabi.ui.components.HesabiButton
 import com.braveboy.hesabi.ui.components.HesabiButtonVariant
@@ -48,6 +50,7 @@ import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.SectionHeader
 import com.braveboy.hesabi.ui.hesabiViewModel
+import com.braveboy.hesabi.ui.security.SecureScreen
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.HesabiTheme
 import java.io.IOException
@@ -62,8 +65,11 @@ fun BackupScreen(
 ) {
     val viewModel: BackupViewModel = hesabiViewModel(container)
     val state by viewModel.state.collectAsStateWithLifecycle()
+    SecureScreen()
     val context = LocalContext.current
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var importMode by remember { mutableStateOf(BackupImportMode.REPLACE) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -91,7 +97,11 @@ fun BackupScreen(
     BackupContent(
         state = state,
         password = password,
+        confirmPassword = confirmPassword,
         onPasswordChange = { password = it },
+        onConfirmPasswordChange = { confirmPassword = it },
+        importMode = importMode,
+        onImportModeChange = { importMode = it },
         onExport = {
             exportLauncher.launch("hesabi-backup-${JalaliDate.today().toStorage()}.hesbin")
         },
@@ -109,11 +119,15 @@ fun BackupScreen(
     pendingImportUri?.let { uri ->
         ConfirmDialog(
             title = "بازیابی از پشتیبان",
-            message = "همهٔ داده‌های فعلی با محتوای این فایل جایگزین می‌شوند. این کار برگشت‌پذیر نیست. مطمئنی؟",
-            confirmLabel = "جایگزین کن",
-            dangerous = true,
+            message = if (importMode == BackupImportMode.REPLACE) {
+                "همهٔ داده‌های فعلی با محتوای این فایل جایگزین می‌شوند. این کار برگشت‌پذیر نیست. مطمئنی؟"
+            } else {
+                "محتوای فایل با داده‌های فعلی ادغام می‌شود؛ موارد هم‌شناسه به‌روزرسانی می‌شوند. ادامه می‌دهی؟"
+            },
+            confirmLabel = if (importMode == BackupImportMode.REPLACE) "جایگزین کن" else "ادغام کن",
+            dangerous = importMode == BackupImportMode.REPLACE,
             onConfirm = {
-                viewModel.importEncrypted(password.toCharArray()) {
+                viewModel.importEncrypted(password.toCharArray(), importMode) {
                     context.contentResolver.openInputStream(uri)
                         ?: throw IOException("فایل قابل خواندن نیست.")
                 }
@@ -131,7 +145,11 @@ private fun openOutput(resolver: ContentResolver, uri: Uri) =
 fun BackupContent(
     state: BackupUiState,
     password: String,
+    confirmPassword: String,
     onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    importMode: BackupImportMode,
+    onImportModeChange: (BackupImportMode) -> Unit,
     onExport: () -> Unit,
     onExportCsv: () -> Unit,
     onPickImport: () -> Unit,
@@ -139,7 +157,9 @@ fun BackupContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val passwordOk = password.length >= 6
+    val strength = passwordStrength(password)
+    val passwordsMatch = confirmPassword.isNotEmpty() && password == confirmPassword
+    val passwordOk = password.length >= 8 && strength >= 2 && passwordsMatch
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -182,7 +202,36 @@ fun BackupContent(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 visualTransformation = PasswordVisualTransformation(),
-                error = if (password.isNotEmpty() && !passwordOk) "رمز باید حداقل ۶ کاراکتر باشد." else null,
+                error = if (password.isNotEmpty() && password.length < 8) {
+                    "رمز باید حداقل ۸ کاراکتر باشد."
+                } else if (confirmPassword.isNotEmpty() && !passwordsMatch) {
+                    "تکرار رمز یکسان نیست."
+                } else {
+                    null
+                },
+            )
+            HesabiTextField(
+                value = confirmPassword,
+                onValueChange = onConfirmPasswordChange,
+                label = "تکرار رمز پشتیبان",
+                placeholder = "همان رمز را دوباره وارد کن",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Text(
+                text = when (strength) {
+                    0 -> "قدرت رمز: خیلی ضعیف"
+                    1 -> "قدرت رمز: ضعیف"
+                    2 -> "قدرت رمز: متوسط"
+                    else -> "قدرت رمز: قوی"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (strength >= 2) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
             )
             if (passwordOk) {
                 InfoBanner(
@@ -227,6 +276,29 @@ fun BackupContent(
             )
         }
         HesabiCard {
+            SectionHeader("بازیابی")
+            Text(
+                text = if (importMode == BackupImportMode.REPLACE) {
+                    "همهٔ داده‌های فعلی جایگزین می‌شوند."
+                } else {
+                    "داده‌های فایل با داده‌های فعلی ادغام می‌شوند."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FilterChipRow(
+                options = BackupImportMode.entries,
+                selected = importMode,
+                onSelect = onImportModeChange,
+                label = { if (it == BackupImportMode.REPLACE) "جایگزینی کامل" else "ادغام" },
+            )
+            Text(
+                text = "فقط فایل‌های پشتیبان حسابی پذیرفته می‌شوند؛ فایل ناشناس پیش از هر تغییری رد می‌شود.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HesabiCard {
             SectionHeader("خروجی CSV")
             Text(
                 text = "برای باز کردن در اکسل یا Google Sheets. فایل CSV رمز ندارد؛ آن را با احتیاط به اشتراک بگذار.",
@@ -244,7 +316,8 @@ fun BackupContent(
             )
         }
         InfoBanner(
-            text = "بازیابی، همهٔ داده‌های فعلی را با فایل پشتیبان جایگزین می‌کند. قبل از بازیابی یک پشتیبان تازه بساز.",
+            text = "پشتیبان شامل تراکنش‌ها، رسیدها، تعهدات، دارایی‌ها، پیامک‌ها و تنظیمات غیرامنیتی است. " +
+                "رمز پشتیبان را جای امن نگه دار؛ بدون آن بازیابی ممکن نیست.",
         )
     }
 }
@@ -262,7 +335,11 @@ private fun BackupPreview() {
                         lastSummary = BackupSummary(12, 2, 14, 1_760_000_000_000),
                     ),
                     password = "secret12",
+                    confirmPassword = "secret12",
                     onPasswordChange = {},
+                    onConfirmPasswordChange = {},
+                    importMode = BackupImportMode.REPLACE,
+                    onImportModeChange = {},
                     onExport = {},
                     onExportCsv = {},
                     onPickImport = {},
@@ -288,7 +365,11 @@ private fun BackupDarkPreview() {
                 BackupContent(
                     state = BackupUiState(),
                     password = "",
+                    confirmPassword = "",
                     onPasswordChange = {},
+                    onConfirmPasswordChange = {},
+                    importMode = BackupImportMode.REPLACE,
+                    onImportModeChange = {},
                     onExport = {},
                     onExportCsv = {},
                     onPickImport = {},
@@ -298,4 +379,14 @@ private fun BackupDarkPreview() {
             }
         }
     }
+}
+
+
+private fun passwordStrength(password: String): Int {
+    if (password.length < 8) return 0
+    var score = 1
+    if (password.any { it.isDigit() } && password.any { it.isLetter() }) score++
+    if (password.any { !it.isLetterOrDigit() }) score++
+    if (password.length >= 12) score++
+    return score.coerceAtMost(3)
 }

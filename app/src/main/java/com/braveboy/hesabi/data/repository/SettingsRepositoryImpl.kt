@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.braveboy.hesabi.core.money.Currency
+import com.braveboy.hesabi.core.security.FieldCrypto
+import com.braveboy.hesabi.domain.model.AiMode
 import com.braveboy.hesabi.domain.model.AppSettings
 import com.braveboy.hesabi.domain.model.ThemeMode
 import com.braveboy.hesabi.domain.repository.SettingsRepository
@@ -38,11 +40,17 @@ class SettingsRepositoryImpl(
         val paydayDayOfMonth = intPreferencesKey("payday_day_of_month")
         val appLockEnabled = booleanPreferencesKey("app_lock_enabled")
         val pinCodeHash = stringPreferencesKey("pin_code_hash")
+        val pinFailedAttempts = intPreferencesKey("pin_failed_attempts")
+        val pinLockedUntil = longPreferencesKey("pin_locked_until")
         val biometricEnabled = booleanPreferencesKey("biometric_enabled")
         val remindersEnabled = booleanPreferencesKey("reminders_enabled")
         val monthlySalary = longPreferencesKey("monthly_salary")
         val salaryAccountId = stringPreferencesKey("salary_account_id")
         val autoDepositSalary = booleanPreferencesKey("auto_deposit_salary")
+        val aiMode = stringPreferencesKey("ai_mode")
+        val lastAssistantUseAt = longPreferencesKey("last_assistant_use_at")
+        val smsRationaleAccepted = booleanPreferencesKey("sms_rationale_accepted")
+        val assetPricesAutoUpdate = booleanPreferencesKey("asset_prices_auto_update")
     }
 
     override val settings: Flow<AppSettings> = context.hesabiSettings.data
@@ -60,12 +68,18 @@ class SettingsRepositoryImpl(
                 defaultAccountId = prefs[Keys.defaultAccountId],
                 paydayDayOfMonth = (prefs[Keys.paydayDayOfMonth] ?: 1).coerceIn(1, 31),
                 appLockEnabled = prefs[Keys.appLockEnabled] ?: false,
-                pinCodeHash = prefs[Keys.pinCodeHash] ?: "",
+                pinCodeHash = FieldCrypto.open(prefs[Keys.pinCodeHash] ?: ""),
+                pinFailedAttempts = prefs[Keys.pinFailedAttempts] ?: 0,
+                pinLockedUntilMillis = prefs[Keys.pinLockedUntil] ?: 0L,
                 biometricEnabled = prefs[Keys.biometricEnabled] ?: false,
                 remindersEnabled = prefs[Keys.remindersEnabled] ?: true,
                 monthlySalaryToman = prefs[Keys.monthlySalary] ?: 0L,
                 salaryAccountId = prefs[Keys.salaryAccountId],
                 autoDepositSalary = prefs[Keys.autoDepositSalary] ?: false,
+                aiMode = AiMode.entries.firstOrNull { it.name == prefs[Keys.aiMode] } ?: AiMode.LOCAL,
+                lastAssistantUseAtMillis = prefs[Keys.lastAssistantUseAt],
+                smsRationaleAccepted = prefs[Keys.smsRationaleAccepted] ?: false,
+                assetPricesAutoUpdate = prefs[Keys.assetPricesAutoUpdate] ?: false,
             )
         }
 
@@ -100,7 +114,15 @@ class SettingsRepositoryImpl(
     }
 
     override suspend fun setPinCodeHash(hash: String) = edit {
-        it[Keys.pinCodeHash] = hash
+        it[Keys.pinCodeHash] = FieldCrypto.seal(hash)
+    }
+
+    override suspend fun setPinFailedAttempts(attempts: Int) = edit {
+        it[Keys.pinFailedAttempts] = attempts.coerceAtLeast(0)
+    }
+
+    override suspend fun setPinLockedUntil(millis: Long) = edit {
+        it[Keys.pinLockedUntil] = millis.coerceAtLeast(0L)
     }
 
     override suspend fun setBiometricEnabled(enabled: Boolean) = edit {
@@ -121,6 +143,22 @@ class SettingsRepositoryImpl(
 
     override suspend fun setAutoDepositSalary(enabled: Boolean) = edit {
         it[Keys.autoDepositSalary] = enabled
+    }
+
+    override suspend fun setAiMode(mode: AiMode) = edit {
+        it[Keys.aiMode] = mode.name
+    }
+
+    override suspend fun setLastAssistantUseAt(millis: Long) = edit {
+        it[Keys.lastAssistantUseAt] = millis
+    }
+
+    override suspend fun setSmsRationaleAccepted(accepted: Boolean) = edit {
+        it[Keys.smsRationaleAccepted] = accepted
+    }
+
+    override suspend fun setAssetPricesAutoUpdate(enabled: Boolean) = edit {
+        it[Keys.assetPricesAutoUpdate] = enabled
     }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {

@@ -2,6 +2,7 @@ package com.braveboy.hesabi.ui.settings
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -39,11 +40,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.money.Currency
 import com.braveboy.hesabi.core.money.Digits
+import com.braveboy.hesabi.core.security.SecurityManager
 import com.braveboy.hesabi.di.AppContainer
+import com.braveboy.hesabi.domain.model.AiMode
 import com.braveboy.hesabi.domain.model.AppSettings
 import com.braveboy.hesabi.domain.model.ThemeMode
 import com.braveboy.hesabi.ui.components.ConfirmDialog
@@ -53,9 +57,12 @@ import com.braveboy.hesabi.ui.components.HesabiCard
 import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.SectionHeader
+import com.braveboy.hesabi.ui.components.FilterChipRow
 import com.braveboy.hesabi.ui.components.SettingsRow
 import com.braveboy.hesabi.ui.hesabiViewModel
+import com.braveboy.hesabi.ui.security.SecureScreen
 import com.braveboy.hesabi.ui.preview.PreviewData
+import com.braveboy.hesabi.ui.security.CurrentPinDialog
 import com.braveboy.hesabi.ui.security.PinSetupDialog
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.HesabiTheme
@@ -68,18 +75,35 @@ fun SettingsScreen(
 ) {
     val viewModel: SettingsViewModel = hesabiViewModel(container)
     val state by viewModel.state.collectAsStateWithLifecycle()
+    SecureScreen()
     val context = LocalContext.current
     var showClearConfirm by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
     var showPaydayPicker by remember { mutableStateOf(false) }
     var showSalarySetup by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
+    var showCurrentPinForChange by remember { mutableStateOf(false) }
+    var showCurrentPinForDisable by remember { mutableStateOf(false) }
+    var showSmsRationale by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             viewModel.setSmsCapture(true)
         } else {
             viewModel.showMessage("اجازهٔ پیامک داده نشد. ثبت خودکار خاموش می‌ماند.")
+        }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.setRemindersEnabled(true)
+        } else {
+            viewModel.showMessage(
+                "اجازهٔ اعلان داده نشد. برای فعال‌کردن یادآور، اعلان برنامه را از تنظیمات گوشی روشن کن.",
+            )
         }
     }
 
@@ -94,7 +118,9 @@ fun SettingsScreen(
             val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
                 PackageManager.PERMISSION_GRANTED
             if (enabled && !granted) {
-                permissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                // Explain the exact permission before the system dialog (market review
+                // and Play/Market policy both expect an in-app rationale).
+                showSmsRationale = true
             } else {
                 viewModel.setSmsCapture(enabled)
             }
@@ -103,14 +129,89 @@ fun SettingsScreen(
         onPickAccount = { showAccountPicker = true },
         onPickPayday = { showPaydayPicker = true },
         onSetupSalary = { showSalarySetup = true },
-        onSetupPin = { showPinSetup = true },
-        onDisableAppLock = { viewModel.setAppLockEnabled(false) },
+        onSetupPin = {
+            if (state.settings.appLockEnabled) {
+                showCurrentPinForChange = true
+            } else {
+                showPinSetup = true
+            }
+        },
+        onDisableAppLock = {
+            if (state.settings.appLockEnabled) {
+                showCurrentPinForDisable = true
+            } else {
+                viewModel.setAppLockEnabled(false)
+            }
+        },
         onBiometricToggle = viewModel::setBiometricEnabled,
-        onRemindersToggle = viewModel::setRemindersEnabled,
+        onRemindersToggle = { enabled ->
+            if (!enabled) {
+                viewModel.setRemindersEnabled(false)
+            } else {
+                val notificationPermissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+                when {
+                    !notificationPermissionGranted ->
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
+                        viewModel.showMessage(
+                            "اعلان‌های برنامه در تنظیمات گوشی خاموش است. برای فعال‌کردن یادآور، آن را روشن کن.",
+                        )
+                    else -> viewModel.setRemindersEnabled(true)
+                }
+            }
+        },
         onClearData = { showClearConfirm = true },
         onDismissMessage = viewModel::dismissMessage,
+        onAiMode = viewModel::setAiMode,
+        onOpenPrivacy = { showPrivacy = true },
         modifier = modifier,
     )
+
+    if (showPrivacy) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPrivacy = false },
+            title = { Text("سیاست حریم خصوصی حسابی") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
+                ) {
+                    androidx.compose.material3.Text(
+                        style = MaterialTheme.typography.bodySmall,
+                        text = "۱. حسابی هیچ حساب کاربری، تبلیغ و ابزار ردیابی ندارد و داده‌ای را به سرور نمی‌فرستد.\n\n" +
+                            "۲. تراکنش‌ها، حساب‌ها، بودجه، تعهدات، پیامک‌های تأییدشده و تصاویر رسید فقط در فضای اختصاصی برنامه روی همین گوشی ذخیره می‌شوند. متن یادداشت‌ها، نام اشخاص و متن پیامک با کلید امن سیستم‌عامل رمز می‌شوند و تصاویر رسید هم رمزنگاری‌شده‌اند.\n\n" +
+                            "۳. پشتیبان خودکار سیستم‌عامل غیرفعال است. پشتیبان دستی فقط با رمز خودت ساخته می‌شود و کلید آن پیش ما نیست.\n\n" +
+                            "۴. مجوز پیامک فقط برای خواندن پیامک‌های تازهٔ بانکی جهت پیشنهاد تراکنش است؛ دفتر پیامک خوانده نمی‌شود و شمارهٔ کارت پیش از ذخیره پوشانده می‌شود. مجوز اعلان برای یادآور سررسید، مجوز میکروفن برای ثبت صوتی و اثر انگشت برای قفل برنامه است.\n\n" +
+                            "۵. دستیار مالی به‌صورت پیش‌فرض محلی کار می‌کند و متن جمله از دستگاه خارج نمی‌شود.\n\n" +
+                            "۶. هر زمان می‌توانی از «پشتیبان و خروجی» داده‌ات را ببری یا از همین صفحه همه‌چیز را برای همیشه پاک کنی.\n\n" +
+                            "۷. گزارش خطای محلی فقط نوع خطا را نگه می‌دارد و مبلغ یا متن یادداشت در آن نیست.\n\n" +
+                            "۸. این سیاست با انتشار هر نسخه بازبینی می‌شود؛ نسخهٔ حقوقی نهایی پیش از انتشار در کافه‌بازار پیوست می‌شود.",
+                    )
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showPrivacy = false }) { Text("باشه") }
+            },
+        )
+    }
+
+    if (showSmsRationale) {
+        ConfirmDialog(
+            title = "چرا اجازهٔ پیامک؟",
+            message = "حسابی فقط پیامک‌های تازهٔ بانکی را می‌خواند تا مبلغ را پیشنهاد کند؛ " +
+                "دفتر پیامک را نمی‌خواند و متن پیامک را جایی نمی‌فرستد. " +
+                "شمارهٔ کارت و حساب پیش از ذخیره پوشانده می‌شود. " +
+                "اگر اجازه ندهی، می‌توانی متن پیامک را خودت از صفحهٔ پیامک‌ها بچسبانی.",
+            confirmLabel = "اجازه می‌دهم",
+            onConfirm = {
+                showSmsRationale = false
+                permissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+            },
+            onDismiss = { showSmsRationale = false },
+        )
+    }
 
     if (showSalarySetup) {
         SalarySetupDialog(
@@ -243,6 +344,30 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showCurrentPinForChange) {
+        CurrentPinDialog(
+            pinCodeHash = state.settings.pinCodeHash,
+            title = "تأیید رمز فعلی برای تغییر رمز",
+            onConfirmed = { _, _ ->
+                showCurrentPinForChange = false
+                showPinSetup = true
+            },
+            onDismiss = { showCurrentPinForChange = false },
+        )
+    }
+
+    if (showCurrentPinForDisable) {
+        CurrentPinDialog(
+            pinCodeHash = state.settings.pinCodeHash,
+            title = "تأیید رمز فعلی برای خاموش‌کردن قفل",
+            onConfirmed = { pin, legacyHash ->
+                viewModel.disableAppLockAfterVerification(pin, legacyHash)
+                showCurrentPinForDisable = false
+            },
+            onDismiss = { showCurrentPinForDisable = false },
+        )
+    }
 }
 
 @Composable
@@ -264,6 +389,8 @@ fun SettingsContent(
     onRemindersToggle: (Boolean) -> Unit,
     onClearData: () -> Unit,
     onDismissMessage: () -> Unit,
+    onAiMode: (AiMode) -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val settings = state.settings
@@ -397,6 +524,28 @@ fun SettingsContent(
             }
         }
         HesabiCard {
+            SectionHeader("دستیار هوشمند")
+            Text(
+                text = "پیش‌فرض «فقط روی گوشی» است: هیچ متن یا تراکنشی برای پردازش ارسال نمی‌شود.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FilterChipRow(
+                options = AiMode.entries,
+                selected = settings.aiMode,
+                onSelect = onAiMode,
+                label = { it.labelFa },
+            )
+            if (settings.aiMode == AiMode.CLOUD) {
+                InfoBanner(
+                    text = "حالت ابری در این نسخه فقط یک انتخاب است و ارسال واقعی انجام نمی‌شود؛ " +
+                        "پیش از فعال‌سازی، دقیقاً مشخص می‌شود چه داده‌ای می‌رود.",
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
+        HesabiCard {
             SectionHeader("یادآورها و هشدارها")
             SwitchRow(
                 title = "یادآور سررسید چک‌ها و اقساط",
@@ -407,6 +556,12 @@ fun SettingsContent(
         }
         HesabiCard {
             SectionHeader("داده‌ها")
+            SettingsRow(
+                title = "سیاست حریم خصوصی",
+                subtitle = "چه چیزی ذخیره می‌شود و چه چیزی نمی‌شود",
+                icon = Icons.Rounded.Lock,
+                onClick = onOpenPrivacy,
+            )
             SettingsRow(
                 title = "پاک کردن همهٔ داده‌ها",
                 subtitle = "بازگشت به حالت اولیه",

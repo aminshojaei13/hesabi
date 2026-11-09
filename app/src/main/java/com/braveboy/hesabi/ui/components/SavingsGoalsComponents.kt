@@ -225,6 +225,13 @@ fun SavingsGoalCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (goal.monthlyTargetToman > 0) {
+                Text(
+                    text = "هدف ماهانه: " + Money.format(goal.monthlyTargetToman),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

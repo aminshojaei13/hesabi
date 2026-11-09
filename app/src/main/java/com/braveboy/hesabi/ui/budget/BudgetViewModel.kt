@@ -3,6 +3,8 @@ package com.braveboy.hesabi.ui.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.braveboy.hesabi.core.date.MonthPeriod
+import com.braveboy.hesabi.domain.logic.EnvelopeBudgetCalculator
+import com.braveboy.hesabi.domain.logic.EnvelopeStatus
 import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
 import com.braveboy.hesabi.domain.model.CategoryKind
@@ -25,12 +27,14 @@ data class BudgetLine(
     val category: Category,
     val budget: Budget?,
     val spentToman: Long,
+    val envelope: EnvelopeStatus? = null,
 )
 
 data class BudgetUiState(
     val period: MonthPeriod = MonthPeriod.current(),
     val overallBudget: Budget? = null,
     val overallSpentToman: Long = 0,
+    val overallEnvelope: EnvelopeStatus? = null,
     val lines: List<BudgetLine> = emptyList(),
     val loading: Boolean = true,
 )
@@ -63,18 +67,26 @@ class BudgetViewModel(
             .filter { it.kind == CategoryKind.EXPENSE && !it.archived }
             .sortedBy { it.sortOrder }
         val lines = expenseCategories.map { category ->
+            val budget = data.budgets.firstOrNull { it.categoryId == category.id }
             BudgetLine(
                 category = category,
-                budget = data.budgets.firstOrNull { it.categoryId == category.id },
+                budget = budget,
                 spentToman = inMonth
                     .filter { it.type == TransactionType.EXPENSE && it.categoryId == category.id }
                     .sumOf { it.amountToman },
+                envelope = budget?.let {
+                    EnvelopeBudgetCalculator.status(it, data.transactions, current)
+                },
             )
         }
+        val overallBudget = data.budgets.firstOrNull { it.categoryId.isBlank() }
         BudgetUiState(
             period = current,
-            overallBudget = data.budgets.firstOrNull { it.categoryId.isBlank() },
+            overallBudget = overallBudget,
             overallSpentToman = overallSpent,
+            overallEnvelope = overallBudget?.let {
+                EnvelopeBudgetCalculator.status(it, data.transactions, current)
+            },
             lines = lines,
             loading = false,
         )
@@ -92,7 +104,7 @@ class BudgetViewModel(
         period.value = MonthPeriod.current()
     }
 
-    fun saveOverall(limitToman: Long) {
+    fun saveOverall(limitToman: Long, rolloverEnabled: Boolean = false) {
         val current = state.value
         viewModelScope.launch {
             budgetRepository.save(
@@ -101,6 +113,7 @@ class BudgetViewModel(
                     categoryId = "",
                     periodKey = current.period.key,
                     limitToman = limitToman.coerceAtLeast(0),
+                    rolloverEnabled = rolloverEnabled,
                 ),
             )
         }
@@ -111,7 +124,7 @@ class BudgetViewModel(
         viewModelScope.launch { budgetRepository.delete(budget.id) }
     }
 
-    fun saveCategory(categoryId: String, limitToman: Long) {
+    fun saveCategory(categoryId: String, limitToman: Long, rolloverEnabled: Boolean = false) {
         val current = state.value
         val existing = current.lines.firstOrNull { it.category.id == categoryId }?.budget
         viewModelScope.launch {
@@ -124,9 +137,25 @@ class BudgetViewModel(
                         categoryId = categoryId,
                         periodKey = current.period.key,
                         limitToman = limitToman,
+                        rolloverEnabled = rolloverEnabled,
                     ),
                 )
             }
+        }
+    }
+
+    fun toggleRollover(categoryId: String) {
+        val line = state.value.lines.firstOrNull { it.category.id == categoryId } ?: return
+        val budget = line.budget ?: return
+        viewModelScope.launch {
+            budgetRepository.save(budget.copy(rolloverEnabled = !budget.rolloverEnabled))
+        }
+    }
+
+    fun toggleOverallRollover() {
+        val budget = state.value.overallBudget ?: return
+        viewModelScope.launch {
+            budgetRepository.save(budget.copy(rolloverEnabled = !budget.rolloverEnabled))
         }
     }
 

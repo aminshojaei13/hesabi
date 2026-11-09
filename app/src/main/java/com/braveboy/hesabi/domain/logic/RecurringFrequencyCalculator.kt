@@ -7,6 +7,20 @@ import com.braveboy.hesabi.domain.model.RecurringFrequency
 object RecurringFrequencyCalculator {
 
     /**
+     * First monthly occurrence at or after [today] for an item anchored on [dayOfMonth].
+     * The anchor is clamped for short months but never permanently shifted.
+     */
+    fun firstMonthlyOccurrence(today: JalaliDate, dayOfMonth: Int): Long {
+        val anchor = dayOfMonth.coerceIn(1, 31)
+        val candidate = JalaliDate(today.year, today.month, anchor.coerceAtMost(today.monthLength()))
+        if (candidate >= today) return candidate.toEpochDay()
+
+        val nextMonth = today.plusMonths(1)
+        val nextDay = anchor.coerceAtMost(nextMonth.monthLength())
+        return JalaliDate(nextMonth.year, nextMonth.month, nextDay).toEpochDay()
+    }
+
+    /**
      * Computes the next occurrence epoch day based on the starting / current epoch day,
      * recurring frequency, interval (default 1), and optional preferred dayOfMonth.
      */

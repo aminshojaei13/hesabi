@@ -83,6 +83,9 @@ fun AddEditGoalDialog(
 ) {
     var title by remember { mutableStateOf(goal?.title ?: "") }
     var targetText by remember { mutableStateOf(goal?.targetAmountToman?.toString() ?: "") }
+    var monthlyTargetText by remember {
+        mutableStateOf(goal?.monthlyTargetToman?.takeIf { it > 0 }?.toString() ?: "")
+    }
     var selectedIcon by remember { mutableStateOf(goal?.iconKey ?: "savings") }
     var selectedColor by remember { mutableLongStateOf(goal?.colorArgb ?: 0xFF10B981L) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -125,6 +128,16 @@ fun AddEditGoalDialog(
                     value = targetText,
                     onValueChange = { targetText = Digits.toAscii(it).filter { ch -> ch.isDigit() }; error = null },
                     label = { Text("مبلغ هدف (تومان)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(HesabiRadius.input),
+                )
+
+                OutlinedTextField(
+                    value = monthlyTargetText,
+                    onValueChange = { monthlyTargetText = Digits.toAscii(it).filter { ch -> ch.isDigit() } },
+                    label = { Text("پس‌انداز ماهانه (اختیاری)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
@@ -193,6 +206,7 @@ fun AddEditGoalDialog(
                         error = "مبلغ هدف باید بیشتر از صفر باشد."
                         return@TextButton
                     }
+                    val monthlyTarget = monthlyTargetText.toLongOrNull() ?: 0L
                     val newGoal = (goal ?: SavingsGoal(
                         id = UUID.randomUUID().toString(),
                         title = title,
@@ -202,6 +216,7 @@ fun AddEditGoalDialog(
                         targetAmountToman = targetAmount,
                         iconKey = selectedIcon,
                         colorArgb = selectedColor,
+                        monthlyTargetToman = monthlyTarget,
                     )
                     onSave(newGoal)
                     onDismiss()

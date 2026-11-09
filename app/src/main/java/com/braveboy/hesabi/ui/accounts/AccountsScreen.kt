@@ -354,7 +354,8 @@ private fun AccountEditorDialog(
         confirmButton = {
             TextButton(
                 onClick = { onSave(name, kind, color, opening, archived) },
-                enabled = name.isNotBlank(),
+                enabled = name.isNotBlank() &&
+                    (openingText.isBlank() || Money.parseToman(openingText) != null),
             ) { Text("ذخیره") }
         },
         dismissButton = {

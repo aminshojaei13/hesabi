@@ -144,8 +144,8 @@ fun SmsScreen(
             categories = state.categories,
             defaultAccountId = state.defaultAccount?.id,
             onDismiss = { accepting = null },
-            onConfirm = { type, amount, accountId, categoryId, epochDay, note ->
-                viewModel.accept(event, type, amount, accountId, categoryId, epochDay, note)
+            onConfirm = { type, amount, accountId, toAccountId, categoryId, epochDay, note ->
+                viewModel.accept(event, type, amount, accountId, toAccountId, categoryId, epochDay, note)
                 accepting = null
             },
         )
@@ -181,8 +181,12 @@ fun SmsContent(
     modifier: Modifier = Modifier,
 ) {
     val autoCategory = { type: TransactionType ->
-        val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
-        state.categories.firstOrNull { it.kind == kind }?.name
+        if (type == TransactionType.TRANSFER) {
+            null
+        } else {
+            val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
+            state.categories.firstOrNull { it.kind == kind }?.name
+        }
     }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -272,7 +276,14 @@ fun SmsContent(
                         title = "در انتظار تأیید (${state.pending.size})",
                         modifier = Modifier.weight(1f),
                     )
-                    if (state.pending.any { it.confidence >= 0.7f && it.amountToman != null }) {
+                    if (
+                        state.pending.any {
+                            it.confidence >= 0.7f &&
+                                it.amountToman != null &&
+                                it.type != null &&
+                                it.type != TransactionType.TRANSFER
+                        }
+                    ) {
                         TextButton(onClick = onBulkAccept, enabled = !state.busy) {
                             Text("ثبت همه", style = MaterialTheme.typography.labelMedium)
                         }
@@ -374,18 +385,25 @@ private fun SmsAcceptDialog(
     categories: List<com.braveboy.hesabi.domain.model.Category>,
     defaultAccountId: String?,
     onDismiss: () -> Unit,
-    onConfirm: (TransactionType, Long, String, String?, Long, String) -> Unit,
+    onConfirm: (TransactionType, Long, String, String?, String?, Long, String) -> Unit,
 ) {
     var type by remember { mutableStateOf(event.type ?: TransactionType.EXPENSE) }
     var amountText by remember {
         mutableStateOf(event.amountToman?.let { Money.format(it, withUnit = false) }.orEmpty())
     }
     var accountId by remember { mutableStateOf(defaultAccountId ?: accounts.firstOrNull()?.id.orEmpty()) }
+    var toAccountId by remember {
+        mutableStateOf(accounts.firstOrNull { it.id != accountId }?.id.orEmpty())
+    }
     var categoryId by remember {
         mutableStateOf(
-            categories.firstOrNull {
-                it.kind == if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
-            }?.id,
+            if (type == TransactionType.TRANSFER) {
+                null
+            } else {
+                categories.firstOrNull {
+                    it.kind == if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
+                }?.id
+            },
         )
     }
     var epochDay by remember { mutableStateOf(event.occurredOnEpochDay) }
@@ -395,6 +413,9 @@ private fun SmsAcceptDialog(
     val relevantCategories = categories.filter {
         it.kind == if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
     }
+    val destinationAccounts = accounts.filter { it.id != accountId }
+    val isTransfer = type == TransactionType.TRANSFER
+    val destinationValid = !isTransfer || (toAccountId.isNotBlank() && toAccountId != accountId)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -405,9 +426,16 @@ private fun SmsAcceptDialog(
                     type = type,
                     onTypeChange = { newType ->
                         type = newType
-                        categoryId = categories.firstOrNull {
-                            it.kind == if (newType == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
-                        }?.id
+                        categoryId = if (newType == TransactionType.TRANSFER) {
+                            null
+                        } else {
+                            categories.firstOrNull {
+                                it.kind == if (newType == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
+                            }?.id
+                        }
+                        if (newType == TransactionType.TRANSFER && toAccountId == accountId) {
+                            toAccountId = accounts.firstOrNull { it.id != accountId }?.id.orEmpty()
+                        }
                     },
                 )
                 HesabiTextField(
@@ -416,19 +444,42 @@ private fun SmsAcceptDialog(
                     label = "مبلغ (تومان)",
                     error = if (amountText.isNotBlank() && amount == null) "مبلغ قابل خواندن نیست." else null,
                 )
-                Text("حساب", style = MaterialTheme.typography.labelMedium)
+                Text(if (isTransfer) "از حساب" else "حساب", style = MaterialTheme.typography.labelMedium)
                 FilterChipRow(
                     options = accounts,
                     selected = accounts.firstOrNull { it.id == accountId },
-                    onSelect = { accountId = it.id },
+                    onSelect = { selected ->
+                        accountId = selected.id
+                        if (toAccountId == selected.id) {
+                            toAccountId = accounts.firstOrNull { it.id != selected.id }?.id.orEmpty()
+                        }
+                    },
                     label = { it.name },
                 )
-                Text("دسته", style = MaterialTheme.typography.labelMedium)
-                CategoryChipRow(
-                    categories = relevantCategories,
-                    selectedId = categoryId,
-                    onSelect = { categoryId = it.id },
-                )
+                if (isTransfer) {
+                    Text("حساب مقصد", style = MaterialTheme.typography.labelMedium)
+                    if (destinationAccounts.isEmpty()) {
+                        Text(
+                            text = "برای انتقال، حداقل دو حساب لازم است.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        FilterChipRow(
+                            options = destinationAccounts,
+                            selected = destinationAccounts.firstOrNull { it.id == toAccountId },
+                            onSelect = { toAccountId = it.id },
+                            label = { it.name },
+                        )
+                    }
+                } else {
+                    Text("دسته", style = MaterialTheme.typography.labelMedium)
+                    CategoryChipRow(
+                        categories = relevantCategories,
+                        selectedId = categoryId,
+                        onSelect = { categoryId = it.id },
+                    )
+                }
                 DateField(date = JalaliDate.fromEpochDay(epochDay), onClick = { showDatePicker = true })
                 HesabiTextField(value = note, onValueChange = { note = it }, label = "توضیح")
             }
@@ -437,9 +488,10 @@ private fun SmsAcceptDialog(
             TextButton(
                 onClick = {
                     val safeAmount = amount ?: return@TextButton
-                    onConfirm(type, safeAmount, accountId, categoryId, epochDay, note)
+                    onConfirm(type, safeAmount, accountId, toAccountId.takeIf { isTransfer }, categoryId, epochDay, note)
                 },
-                enabled = amount != null && amount > 0 && accountId.isNotBlank() && categoryId != null,
+                enabled = amount != null && amount > 0 && accountId.isNotBlank() &&
+                    destinationValid && (isTransfer || categoryId != null),
             ) { Text("ثبت") }
         },
         dismissButton = {

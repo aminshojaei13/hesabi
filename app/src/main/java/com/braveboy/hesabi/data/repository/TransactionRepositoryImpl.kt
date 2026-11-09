@@ -21,19 +21,39 @@ class TransactionRepositoryImpl(
     override fun observeRecent(limit: Int): Flow<List<Transaction>> =
         transactionDao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
 
+    override fun observeTrash(): Flow<List<Transaction>> =
+        transactionDao.observeTrash().map { list -> list.map { it.toDomain() } }
+
     override suspend fun getBetween(start: Long, endExclusive: Long): List<Transaction> =
         transactionDao.getBetween(start, endExclusive).map { it.toDomain() }
 
     override suspend fun getAll(): List<Transaction> = transactionDao.getAll().map { it.toDomain() }
 
+    override suspend fun getAllIncludingDeleted(): List<Transaction> =
+        transactionDao.getAllIncludingDeleted().map { it.toDomain() }
+
     override suspend fun getById(id: String): Transaction? = transactionDao.findById(id)?.toDomain()
+
+    override suspend fun findByExternalRef(ref: String): Transaction? =
+        transactionDao.findByExternalRef(ref)?.toDomain()
+
+    override suspend fun findByLinkedEntity(type: String, id: String): List<Transaction> =
+        transactionDao.findByLinkedEntity(type, id).map { it.toDomain() }
 
     override suspend fun save(transaction: Transaction) = transactionDao.upsert(transaction.toEntity())
 
     override suspend fun saveAll(transactions: List<Transaction>) =
         transactionDao.upsertAll(transactions.map { it.toEntity() })
 
-    override suspend fun delete(id: String) = transactionDao.deleteById(id)
+    override suspend fun delete(id: String) =
+        transactionDao.softDelete(id, System.currentTimeMillis())
+
+    override suspend fun restore(id: String) = transactionDao.restore(id)
+
+    override suspend fun deletePermanently(id: String) = transactionDao.deleteById(id)
+
+    override suspend fun purgeTrash(olderThanMillis: Long): Int =
+        transactionDao.purgeExpired(olderThanMillis)
 
     override suspend fun countForCategory(categoryId: String): Int = transactionDao.countForCategory(categoryId)
 

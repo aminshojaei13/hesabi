@@ -117,20 +117,43 @@ class RecurringTransactionsViewModel(
             notice.value = null to "مبلغ باید بیشتر از صفر باشد."
             return
         }
+        if (intent.type == TransactionType.TRANSFER) {
+            if (intent.toAccountId.isNullOrBlank()) {
+                notice.value = null to "حساب مقصد را انتخاب کن."
+                return
+            }
+            if (intent.toAccountId == intent.accountId) {
+                notice.value = null to "حساب مبدأ و مقصد نباید یکی باشند."
+                return
+            }
+        }
         viewModelScope.launch {
             val existing = intent.id?.let { recurringRepo.getById(it) }
-            val nextEpochDay = existing?.nextOccurrenceEpochDay ?: intent.startEpochDay
+            val anchorDay = when {
+                intent.frequency != RecurringFrequency.MONTHLY -> null
+                intent.dayOfMonth != null -> intent.dayOfMonth.coerceIn(1, 31)
+                else -> JalaliDate.fromEpochDay(intent.startEpochDay).day
+            }
+            val scheduleChanged = existing != null &&
+                (existing.frequency != intent.frequency || existing.dayOfMonth != anchorDay)
+            val nextEpochDay = when {
+                existing == null -> intent.startEpochDay
+                !scheduleChanged -> existing.nextOccurrenceEpochDay
+                intent.frequency == RecurringFrequency.MONTHLY -> RecurringFrequencyCalculator
+                    .firstMonthlyOccurrence(JalaliDate.today(), anchorDay ?: JalaliDate.today().day)
+                else -> JalaliDate.today().toEpochDay()
+            }
             val item = RecurringTransaction(
                 id = intent.id ?: "rec_" + UUID.randomUUID().toString().take(8),
                 title = cleanTitle,
                 type = intent.type,
                 amountToman = intent.amountToman,
                 accountId = intent.accountId,
-                toAccountId = intent.toAccountId,
+                toAccountId = intent.toAccountId.takeIf { intent.type == TransactionType.TRANSFER },
                 categoryId = intent.categoryId,
                 frequency = intent.frequency,
                 interval = intent.interval.coerceAtLeast(1),
-                dayOfMonth = intent.dayOfMonth,
+                dayOfMonth = anchorDay,
                 nextOccurrenceEpochDay = nextEpochDay,
                 lastAppliedEpochDay = existing?.lastAppliedEpochDay,
                 autoApply = intent.autoApply,

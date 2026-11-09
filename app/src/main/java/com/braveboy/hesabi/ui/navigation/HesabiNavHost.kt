@@ -29,8 +29,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -54,22 +59,33 @@ import com.braveboy.hesabi.domain.model.AppSettings
 import com.braveboy.hesabi.domain.model.TransactionType
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.ui.accounts.AccountsScreen
+import com.braveboy.hesabi.ui.annual.AnnualReportScreen
+import com.braveboy.hesabi.ui.assets.AssetsScreen
+import com.braveboy.hesabi.ui.assistant.AssistantScreen
+import com.braveboy.hesabi.ui.calendar.DueCalendarScreen
+import com.braveboy.hesabi.ui.importer.ImportScreen
+import com.braveboy.hesabi.ui.privacy.MyDataScreen
+import com.braveboy.hesabi.ui.simulator.PurchaseSimulatorScreen
+import com.braveboy.hesabi.ui.trash.TrashScreen
 import com.braveboy.hesabi.ui.backup.BackupScreen
 import com.braveboy.hesabi.ui.budget.BudgetScreen
 import com.braveboy.hesabi.ui.categories.CategoriesScreen
 import com.braveboy.hesabi.ui.debts.DebtsAndCommitmentsScreen
 import com.braveboy.hesabi.ui.entry.AddEditScreen
+import com.braveboy.hesabi.ui.entry.QuickEntryScreen
 import com.braveboy.hesabi.ui.home.HomeScreen
 import com.braveboy.hesabi.ui.more.MoreScreen
 import com.braveboy.hesabi.ui.onboarding.OnboardingScreen
 import com.braveboy.hesabi.ui.recurring.RecurringTransactionsScreen
 import com.braveboy.hesabi.ui.reports.ReportsScreen
 import com.braveboy.hesabi.ui.security.AppLockScreen
+import com.braveboy.hesabi.ui.security.findActivity
 import com.braveboy.hesabi.ui.settings.SettingsScreen
 import com.braveboy.hesabi.ui.sms.SmsScreen
 import com.braveboy.hesabi.ui.theme.HesabiTheme
 import com.braveboy.hesabi.ui.transactions.TransactionsScreen
 import com.braveboy.hesabi.ui.voice.VoiceEntrySheet
+import kotlinx.coroutines.launch
 
 object Routes {
     const val HOME = "home"
@@ -85,12 +101,25 @@ object Routes {
     const val DEBTS = "debts"
     const val RECURRING = "recurring"
     const val ENTRY = "entry?editId={editId}&type={type}"
+    const val QUICK = "quick?type={type}"
+    const val ASSISTANT = "assistant"
+    const val ASSETS = "assets"
+    const val TRASH = "trash"
+    const val IMPORT = "import"
+    const val MY_DATA = "my_data"
+    const val ANNUAL = "annual"
+    const val CALENDAR = "calendar"
+    const val SIMULATOR = "simulator"
 
     fun newEntry(type: TransactionType): String = "entry?type=${type.name}"
+    fun quickEntry(type: TransactionType): String = "quick?type=${type.name}"
     fun editEntry(id: String): String = "entry?editId=$id&type=${TransactionType.EXPENSE.name}"
 }
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
+
+/** Re-lock the app after it has been in the background for this long. */
+private const val APP_LOCK_GRACE_MILLIS = 30_000L
 
 private val tabs = listOf(
     Tab(Routes.HOME, "خانه", Icons.Rounded.Home),
@@ -105,10 +134,46 @@ fun HesabiRoot(
     initialSettings: AppSettings,
     sharedText: String?,
     onSharedTextConsumed: () -> Unit,
+    openSmsRequested: Boolean = false,
+    onOpenSmsConsumed: () -> Unit = {},
 ) {
     val settings by container.settingsRepository.settings.collectAsStateWithLifecycle(initialValue = initialSettings)
     var isAppLocked by remember(settings.appLockEnabled) {
         mutableStateOf(settings.appLockEnabled && settings.pinCodeHash.isNotBlank())
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.SideEffect {
+        val window = context.findActivity()?.window
+        if (settings.appLockEnabled || settings.hideAmounts) {
+            window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+    var backgroundedAtMillis by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(lifecycleOwner, settings.appLockEnabled, settings.pinCodeHash) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> backgroundedAtMillis = System.currentTimeMillis()
+                Lifecycle.Event.ON_START -> {
+                    val lockConfigured = settings.appLockEnabled && settings.pinCodeHash.isNotBlank()
+                    val elapsed = if (backgroundedAtMillis > 0L) {
+                        System.currentTimeMillis() - backgroundedAtMillis
+                    } else {
+                        0L
+                    }
+                    if (lockConfigured && backgroundedAtMillis > 0L && elapsed >= APP_LOCK_GRACE_MILLIS) {
+                        isAppLocked = true
+                    }
+                    backgroundedAtMillis = 0L
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     HesabiTheme(
@@ -121,7 +186,21 @@ fun HesabiRoot(
             AppLockScreen(
                 pinCodeHash = settings.pinCodeHash,
                 biometricEnabled = settings.biometricEnabled,
-                onUnlocked = { isAppLocked = false },
+                failedAttempts = settings.pinFailedAttempts,
+                lockedUntilMillis = settings.pinLockedUntilMillis,
+                onUnlocked = {
+                    isAppLocked = false
+                    container.applicationScope.launch {
+                        container.settingsRepository.setPinFailedAttempts(0)
+                        container.settingsRepository.setPinLockedUntil(0L)
+                    }
+                },
+                onAttemptStateChanged = { attempts, lockedUntil ->
+                    container.applicationScope.launch {
+                        container.settingsRepository.setPinFailedAttempts(attempts)
+                        container.settingsRepository.setPinLockedUntil(lockedUntil)
+                    }
+                },
             )
         } else if (!settings.onboarded) {
             OnboardingScreen(container = container)
@@ -130,6 +209,8 @@ fun HesabiRoot(
                 container = container,
                 sharedText = sharedText,
                 onSharedTextConsumed = onSharedTextConsumed,
+                openSmsRequested = openSmsRequested,
+                onOpenSmsConsumed = onOpenSmsConsumed,
             )
         }
     }
@@ -140,6 +221,8 @@ private fun MainScaffold(
     container: AppContainer,
     sharedText: String?,
     onSharedTextConsumed: () -> Unit,
+    openSmsRequested: Boolean,
+    onOpenSmsConsumed: () -> Unit,
 ) {
     val navController = rememberNavController()
     var showVoiceSheet by remember { mutableStateOf(false) }
@@ -152,6 +235,13 @@ private fun MainScaffold(
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
             navController.navigate(Routes.SMS)
+        }
+    }
+
+    LaunchedEffect(openSmsRequested) {
+        if (openSmsRequested) {
+            navController.navigate(Routes.SMS)
+            onOpenSmsConsumed()
         }
     }
 
@@ -180,7 +270,7 @@ private fun MainScaffold(
                     currentRoute = currentRoute,
                     pendingSmsCount = pendingSms,
                     onTabSelected = { route -> navigateTab(navController, route) },
-                    onAddClick = { navController.navigate(Routes.newEntry(TransactionType.EXPENSE)) },
+                    onAddClick = { navController.navigate(Routes.quickEntry(TransactionType.EXPENSE)) },
                 )
             }
         },
@@ -193,13 +283,14 @@ private fun MainScaffold(
                 composable(Routes.HOME) {
                     HomeScreen(
                         container = container,
-                        onAdd = { type -> navController.navigate(Routes.newEntry(type)) },
+                        onAdd = { type -> navController.navigate(Routes.quickEntry(type)) },
                         onSeeAll = { navigateTab(navController, Routes.TRANSACTIONS) },
                         onTransactionClick = { id -> navController.navigate(Routes.editEntry(id)) },
                         onOpenSms = { navController.navigate(Routes.SMS) },
                         onOpenBudget = { navController.navigate(Routes.BUDGET) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onOpenVoice = { showVoiceSheet = true },
+                        onOpenAssistant = { navController.navigate(Routes.ASSISTANT) },
                     )
                 }
                 composable(Routes.TRANSACTIONS) {
@@ -225,6 +316,37 @@ private fun MainScaffold(
                         onSms = { navController.navigate(Routes.SMS) },
                         onBackup = { navController.navigate(Routes.BACKUP) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
+                        onAssistant = { navController.navigate(Routes.ASSISTANT) },
+                        onAssets = { navController.navigate(Routes.ASSETS) },
+                        onTrash = { navController.navigate(Routes.TRASH) },
+                        onImport = { navController.navigate(Routes.IMPORT) },
+                        onMyData = { navController.navigate(Routes.MY_DATA) },
+                        onAnnual = { navController.navigate(Routes.ANNUAL) },
+                        onCalendar = { navController.navigate(Routes.CALENDAR) },
+                        onSimulator = { navController.navigate(Routes.SIMULATOR) },
+                    )
+                }
+                composable(
+                    route = Routes.QUICK,
+                    arguments = listOf(
+                        navArgument("type") {
+                            type = NavType.StringType
+                            defaultValue = TransactionType.EXPENSE.name
+                        },
+                    ),
+                ) { entry ->
+                    val type = entry.arguments?.getString("type")
+                        ?.let { runCatching { TransactionType.valueOf(it) }.getOrNull() }
+                    QuickEntryScreen(
+                        container = container,
+                        initialType = type,
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                        onOpenFullForm = { formType ->
+                            navController.navigate(Routes.newEntry(formType)) {
+                                popUpTo(Routes.QUICK) { inclusive = true }
+                            }
+                        },
                     )
                 }
                 composable(
@@ -280,6 +402,41 @@ private fun MainScaffold(
                 }
                 composable(Routes.RECURRING) {
                     RecurringTransactionsScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.ASSISTANT) {
+                    AssistantScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.ASSETS) {
+                    AssetsScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.TRASH) {
+                    TrashScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.IMPORT) {
+                    ImportScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.MY_DATA) {
+                    MyDataScreen(
+                        container = container,
+                        onBack = { navController.popBackStack() },
+                        onOpenBackup = { navController.navigate(Routes.BACKUP) },
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    )
+                }
+                composable(Routes.ANNUAL) {
+                    AnnualReportScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.CALENDAR) {
+                    DueCalendarScreen(container = container, onBack = { navController.popBackStack() })
+                }
+                composable(Routes.SIMULATOR) {
+                    PurchaseSimulatorScreen(
+                        container = container,
+                        onBack = { navController.popBackStack() },
+                        onAddExpense = {
+                            navController.navigate(Routes.quickEntry(TransactionType.EXPENSE))
+                        },
+                    )
                 }
             }
         }

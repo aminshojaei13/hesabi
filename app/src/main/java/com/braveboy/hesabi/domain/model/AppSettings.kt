@@ -21,11 +21,18 @@ data class AppSettings(
     val paydayDayOfMonth: Int = 1,
     val appLockEnabled: Boolean = false,
     val pinCodeHash: String = "",
+    val pinFailedAttempts: Int = 0,
+    val pinLockedUntilMillis: Long = 0L,
     val biometricEnabled: Boolean = false,
     val remindersEnabled: Boolean = true,
     val monthlySalaryToman: Long = 0L,
     val salaryAccountId: String? = null,
     val autoDepositSalary: Boolean = false,
+    /** Local is the default; the cloud option is a declaration of intent for now. */
+    val aiMode: AiMode = AiMode.LOCAL,
+    val lastAssistantUseAtMillis: Long? = null,
+    val smsRationaleAccepted: Boolean = false,
+    val assetPricesAutoUpdate: Boolean = false,
 )
 
 data class AccountWithBalance(
@@ -38,6 +45,8 @@ data class BackupSummary(
     val accountCount: Int,
     val categoryCount: Int,
     val exportedAtMillis: Long,
+    val receiptCount: Int = 0,
+    val skippedReceipts: Int = 0,
 )
 
 data class ImportResult(

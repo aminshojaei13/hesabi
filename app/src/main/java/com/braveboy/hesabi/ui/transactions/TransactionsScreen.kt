@@ -63,6 +63,8 @@ fun TransactionsScreen(
         state = state,
         onQueryChange = viewModel::setQuery,
         onTypeChange = viewModel::setType,
+        onAccountChange = viewModel::setAccount,
+        onCategoryChange = viewModel::setCategory,
         onPreviousMonth = viewModel::previousMonth,
         onNextMonth = viewModel::nextMonth,
         onToggleAll = viewModel::toggleAllPeriods,
@@ -80,6 +82,8 @@ fun TransactionsContent(
     state: TransactionsUiState,
     onQueryChange: (String) -> Unit,
     onTypeChange: (TransactionType?) -> Unit,
+    onAccountChange: (String?) -> Unit = {},
+    onCategoryChange: (String?) -> Unit = {},
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onToggleAll: () -> Unit,
@@ -127,6 +131,32 @@ fun TransactionsContent(
                     selected = state.filter.type,
                     onSelect = onTypeChange,
                     label = { it?.label ?: "همه" },
+                )
+            }
+            item {
+                val accounts = remember(state.accounts) { state.accounts.values.sortedBy { it.sortOrder } }
+                FilterChipRow(
+                    options = listOf<com.braveboy.hesabi.domain.model.Account?>(null) + accounts,
+                    selected = state.filter.accountId?.let { state.accounts[it] },
+                    onSelect = { onAccountChange(it?.id) },
+                    label = { it?.name ?: "همهٔ حساب‌ها" },
+                )
+            }
+            item {
+                val categories = remember(state.categories, state.filter.type) {
+                    state.categories.values
+                        .filter { category ->
+                            state.filter.type == null ||
+                                (state.filter.type == TransactionType.EXPENSE && category.kind == com.braveboy.hesabi.domain.model.CategoryKind.EXPENSE) ||
+                                (state.filter.type == TransactionType.INCOME && category.kind == com.braveboy.hesabi.domain.model.CategoryKind.INCOME)
+                        }
+                        .sortedBy { it.sortOrder }
+                }
+                FilterChipRow(
+                    options = listOf<com.braveboy.hesabi.domain.model.Category?>(null) + categories,
+                    selected = state.filter.categoryId?.let { state.categories[it] },
+                    onSelect = { onCategoryChange(it?.id) },
+                    label = { it?.name ?: "همهٔ دسته‌ها" },
                 )
             }
             if (!state.loading) {

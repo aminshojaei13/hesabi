@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.date.MonthPeriod
 import com.braveboy.hesabi.domain.logic.DailySafeToSpend
+import com.braveboy.hesabi.domain.logic.EndOfMonthForecast
+import com.braveboy.hesabi.domain.logic.MonthForecastCalculator
 import com.braveboy.hesabi.domain.logic.PaydayCycle
 import com.braveboy.hesabi.domain.logic.PaydayCycleCalculator
 import com.braveboy.hesabi.domain.logic.ReportCalculator
@@ -45,6 +47,7 @@ data class HomeUiState(
     val autoDepositSalary: Boolean = false,
     val liquidityForecast: com.braveboy.hesabi.domain.logic.LiquidityForecast? = null,
     val pendingSmsCount: Int = 0,
+    val forecast: EndOfMonthForecast? = null,
     val loading: Boolean = true,
 ) {
     val totalBalanceToman: Long get() = balances.sumOf { it.balanceToman }
@@ -62,6 +65,7 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val period = MutableStateFlow(MonthPeriod.current())
+    private var followsCurrentMonth = true
 
     private data class Core(
         val transactions: List<Transaction>,
@@ -121,7 +125,7 @@ class HomeViewModel(
             .filter { it.type == TransactionType.EXPENSE && it.occurredOnEpochDay == todayEpochDay }
             .sumOf { it.amountToman }
 
-        val totalBalance = data.balances.sumOf { it.balanceToman }
+        val totalBalance = data.balances.filterNot { it.account.archived }.sumOf { it.balanceToman }
         val goalsAllocated = data.goals.sumOf { it.savedAmountToman }
 
         val safeToSpend = PaydayCycleCalculator.calculateSafeToSpend(
@@ -142,6 +146,14 @@ class HomeViewModel(
             )
         } else null
 
+        val forecast = MonthForecastCalculator.forecast(
+            period = current,
+            today = today,
+            transactions = data.transactions,
+            currentBalanceToman = totalBalance,
+            monthlyBudgetLimitToman = report.budgetLimitToman,
+        )
+
         HomeUiState(
             period = current,
             report = report,
@@ -159,20 +171,31 @@ class HomeViewModel(
             autoDepositSalary = data.autoDepositSalary,
             liquidityForecast = liquidityForecast,
             pendingSmsCount = pendingSms,
+            forecast = forecast,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun previousMonth() {
+        followsCurrentMonth = false
         period.value = period.value.previous()
     }
 
     fun nextMonth() {
+        followsCurrentMonth = false
         period.value = period.value.next()
     }
 
     fun goToCurrentMonth() {
+        followsCurrentMonth = true
         period.value = MonthPeriod.current()
+    }
+
+    /** Called on resume so crossing midnight into a new month refreshes the card (M29). */
+    fun refreshIfMonthChanged() {
+        if (followsCurrentMonth) {
+            period.value = MonthPeriod.current()
+        }
     }
 
     fun updateSalarySettings(

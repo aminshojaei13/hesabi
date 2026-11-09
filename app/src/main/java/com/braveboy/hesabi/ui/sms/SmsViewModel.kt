@@ -23,6 +23,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Persian keywords used to route a bulk-accepted SMS to a sensible category. */
+private val categoryKeywords = mapOf(
+    "خوراک" to listOf("رستوران", "کافه", "فست‌فود", "اسنپ‌فود", "خرید غذا"),
+    "حمل‌ونقل" to listOf("تاکسی", "اسنپ", "مترو", "اتوبوس", "بنزین", "سوخت", "پارکینگ"),
+    "خانه" to listOf("اجاره", "شارژ ساختمان", "آب", "برق", "گاز"),
+    "سلامت" to listOf("داروخانه", "بیمارستان", "پزشک", "درمان"),
+    "خرید" to listOf("فروشگاه", "دیجی‌کالا", "خرید"),
+    "قبض‌ها" to listOf("قبض", "اینترنت", "تلفن", "همراه اول", "ایرانسل"),
+    "سرگرمی" to listOf("سینما", "بلیط", "بازی"),
+    "آموزش" to listOf("مدرسه", "دانشگاه", "کلاس", "کتاب"),
+    "حقوق" to listOf("حقوق", "پاداش"),
+    "فروش" to listOf("فروش", "درگاه"),
+)
+
 data class SmsUiState(
     val pending: List<SmsEvent> = emptyList(),
     val recent: List<SmsEvent> = emptyList(),
@@ -108,6 +122,7 @@ class SmsViewModel(
         type: TransactionType,
         amountToman: Long,
         accountId: String,
+        toAccountId: String?,
         categoryId: String?,
         occurredOnEpochDay: Long,
         note: String,
@@ -121,6 +136,7 @@ class SmsViewModel(
                         type = type,
                         amountToman = amountToman,
                         accountId = accountId,
+                        toAccountId = toAccountId,
                         categoryId = categoryId,
                         occurredOnEpochDay = occurredOnEpochDay,
                         note = note.ifBlank { event.merchant ?: "ثبت از پیامک" },
@@ -130,7 +146,7 @@ class SmsViewModel(
             notice.value = if (accepted > 0) {
                 "پیامک به تراکنش تبدیل شد." to null
             } else {
-                null to "ثبت نشد. دسته و حساب را بررسی کن."
+                null to "ثبت نشد. حساب مقصد، دسته و حساب را بررسی کن."
             }
             busy.value = false
         }
@@ -139,32 +155,60 @@ class SmsViewModel(
     fun bulkAccept() {
         val current = state.value
         val account = current.defaultAccount ?: return
-        val entries = current.pending
-            .filter { it.amountToman != null && it.amountToman > 0 && it.confidence >= 0.7f }
-            .mapNotNull { event ->
-                val type = event.type ?: return@mapNotNull null
-                val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
-                val category = current.categories.firstOrNull { it.kind == kind }
-                SmsAcceptInput(
-                    eventId = event.id,
-                    type = type,
-                    amountToman = event.amountToman ?: return@mapNotNull null,
-                    accountId = account.id,
-                    categoryId = category?.id,
-                    occurredOnEpochDay = event.occurredOnEpochDay,
-                    note = event.merchant ?: "ثبت گروهی از پیامک",
-                )
-            }
+        val eligible = current.pending.filter {
+            it.amountToman != null && it.amountToman > 0 && it.confidence >= 0.7f &&
+                it.type != null && it.type != TransactionType.TRANSFER
+        }
+        val entries = eligible.mapNotNull { event ->
+            val type = event.type ?: return@mapNotNull null
+            val category = detectCategory(event, type, current.categories) ?: return@mapNotNull null
+            SmsAcceptInput(
+                eventId = event.id,
+                type = type,
+                amountToman = event.amountToman ?: return@mapNotNull null,
+                accountId = account.id,
+                categoryId = category.id,
+                occurredOnEpochDay = event.occurredOnEpochDay,
+                note = event.merchant ?: "ثبت گروهی از پیامک",
+            )
+        }
         if (entries.isEmpty()) {
-            notice.value = null to "پیامک با اطمینان کافی برای ثبت گروهی وجود ندارد."
+            notice.value = null to "برای ثبت گروهی، پیامکی با دستهٔ قابل تشخیص پیدا نشد. هر ردیف را دستی ثبت کن."
             return
         }
         viewModelScope.launch {
             busy.value = true
             val accepted = smsRepository.acceptAll(entries)
-            notice.value = "${accepted} پیامک ثبت شد. بقیه را دستی بررسی کن." to null
+            val remaining = eligible.size - accepted
+            notice.value = if (remaining > 0) {
+                "$accepted پیامک ثبت شد. $remaining مورد را دستی بررسی کن." to null
+            } else {
+                "$accepted پیامک ثبت شد." to null
+            }
             busy.value = false
         }
+    }
+
+    /** Picks a category from the SMS text instead of dumping everything into the first category. */
+    private fun detectCategory(
+        event: SmsEvent,
+        type: TransactionType,
+        categories: List<Category>,
+    ): Category? {
+        if (type == TransactionType.TRANSFER) return null
+        val kind = if (type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
+        val candidates = categories.filter { it.kind == kind }
+        val text = buildString {
+            if (!event.merchant.isNullOrBlank()) append(event.merchant).append(' ')
+            append(event.body)
+        }
+        for ((categoryName, keywords) in categoryKeywords) {
+            if (keywords.any { text.contains(it, ignoreCase = true) }) {
+                candidates.firstOrNull { it.name == categoryName }?.let { return it }
+            }
+        }
+        // The generic bucket is a safe fallback; never guess a specific category.
+        return candidates.firstOrNull { it.name == "سایر" }
     }
 
     fun ignore(event: SmsEvent) {

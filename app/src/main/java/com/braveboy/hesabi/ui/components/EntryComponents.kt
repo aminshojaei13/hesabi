@@ -26,6 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -311,7 +315,11 @@ fun CategoryGrid(
                         onClick = { onSelect(category) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(76.dp),
+                            .height(76.dp)
+                            .semantics {
+                                role = Role.Button
+                                stateDescription = if (selected) "انتخاب شده" else "انتخاب نشده"
+                            },
                         shape = RoundedCornerShape(14.dp),
                         color = if (selected) color.copy(alpha = 0.14f) else Color.Transparent,
                         border = if (selected) BorderStroke(1.5.dp, color) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

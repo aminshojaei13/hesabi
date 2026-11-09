@@ -7,10 +7,19 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.braveboy.hesabi.di.AppContainer
 import com.braveboy.hesabi.ui.accounts.AccountsViewModel
+import com.braveboy.hesabi.ui.assistant.AssistantViewModel
+import com.braveboy.hesabi.ui.annual.AnnualReportViewModel
+import com.braveboy.hesabi.ui.assets.AssetsViewModel
+import com.braveboy.hesabi.ui.calendar.DueCalendarViewModel
+import com.braveboy.hesabi.ui.importer.ImportViewModel
+import com.braveboy.hesabi.ui.simulator.PurchaseSimulatorViewModel
+import com.braveboy.hesabi.ui.trash.TrashViewModel
+import com.braveboy.hesabi.data.importer.TransactionImporter
 import com.braveboy.hesabi.ui.backup.BackupViewModel
 import com.braveboy.hesabi.ui.budget.BudgetViewModel
 import com.braveboy.hesabi.ui.categories.CategoriesViewModel
 import com.braveboy.hesabi.ui.entry.AddEditViewModel
+import com.braveboy.hesabi.ui.entry.QuickEntryViewModel
 import com.braveboy.hesabi.ui.home.HomeViewModel
 import com.braveboy.hesabi.ui.reports.ReportsViewModel
 import com.braveboy.hesabi.ui.settings.SettingsViewModel
@@ -47,6 +56,58 @@ class HesabiViewModelFactory(
                 categoryRepository = container.categoryRepository,
                 settingsRepository = container.settingsRepository,
             )
+            modelClass.isAssignableFrom(AssistantViewModel::class.java) -> AssistantViewModel(
+                transactionRepository = container.transactionRepository,
+                accountRepository = container.accountRepository,
+                categoryRepository = container.categoryRepository,
+                budgetRepository = container.budgetRepository,
+                savingsGoalRepository = container.savingsGoalRepository,
+                settingsRepository = container.settingsRepository,
+            )
+            modelClass.isAssignableFrom(AssetsViewModel::class.java) -> AssetsViewModel(
+                assetRepository = container.assetRepository,
+                diagnosticsRepository = container.diagnosticsRepository,
+            )
+            modelClass.isAssignableFrom(TrashViewModel::class.java) -> TrashViewModel(
+                transactionRepository = container.transactionRepository,
+            )
+            modelClass.isAssignableFrom(ImportViewModel::class.java) -> ImportViewModel(
+                importer = TransactionImporter(
+                    transactionRepository = container.transactionRepository,
+                    accountRepository = container.accountRepository,
+                    categoryRepository = container.categoryRepository,
+                ),
+                settingsRepository = container.settingsRepository,
+            )
+            modelClass.isAssignableFrom(DueCalendarViewModel::class.java) -> DueCalendarViewModel(
+                chequeRepository = container.chequeRepository,
+                loanRepository = container.loanRepository,
+                debtRepository = container.debtRepository,
+                personRepository = container.personRepository,
+                recurringRepository = container.recurringTransactionRepository,
+                savingsGoalRepository = container.savingsGoalRepository,
+                settingsRepository = container.settingsRepository,
+            )
+            modelClass.isAssignableFrom(PurchaseSimulatorViewModel::class.java) -> PurchaseSimulatorViewModel(
+                transactionRepository = container.transactionRepository,
+                accountRepository = container.accountRepository,
+                budgetRepository = container.budgetRepository,
+                savingsGoalRepository = container.savingsGoalRepository,
+                settingsRepository = container.settingsRepository,
+            )
+            modelClass.isAssignableFrom(AnnualReportViewModel::class.java) -> AnnualReportViewModel(
+                transactionRepository = container.transactionRepository,
+                categoryRepository = container.categoryRepository,
+                assetRepository = container.assetRepository,
+            )
+            modelClass.isAssignableFrom(QuickEntryViewModel::class.java) -> QuickEntryViewModel(
+                transactionRepository = container.transactionRepository,
+                accountRepository = container.accountRepository,
+                categoryRepository = container.categoryRepository,
+                quickTemplateRepository = container.quickTemplateRepository,
+                settingsRepository = container.settingsRepository,
+                initialType = initialType,
+            )
             modelClass.isAssignableFrom(TransactionsViewModel::class.java) -> TransactionsViewModel(
                 transactionRepository = container.transactionRepository,
                 categoryRepository = container.categoryRepository,
@@ -56,6 +117,7 @@ class HesabiViewModelFactory(
                 transactionRepository = container.transactionRepository,
                 categoryRepository = container.categoryRepository,
                 budgetRepository = container.budgetRepository,
+                accountRepository = container.accountRepository,
             )
             modelClass.isAssignableFrom(AccountsViewModel::class.java) -> AccountsViewModel(
                 accountRepository = container.accountRepository,
@@ -96,6 +158,9 @@ class HesabiViewModelFactory(
                 debtRepository = container.debtRepository,
                 chequeRepository = container.chequeRepository,
                 loanRepository = container.loanRepository,
+                transactionRepository = container.transactionRepository,
+                accountRepository = container.accountRepository,
+                categoryRepository = container.categoryRepository,
                 settingsRepository = container.settingsRepository,
             )
             modelClass.isAssignableFrom(com.braveboy.hesabi.ui.recurring.RecurringTransactionsViewModel::class.java) -> com.braveboy.hesabi.ui.recurring.RecurringTransactionsViewModel(

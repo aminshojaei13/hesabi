@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
@@ -36,12 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.date.MonthPeriod
@@ -56,6 +62,7 @@ import com.braveboy.hesabi.ui.components.BalanceHero
 import com.braveboy.hesabi.ui.components.BudgetProgressCard
 import com.braveboy.hesabi.ui.components.DailySafeToSpendWidget
 import com.braveboy.hesabi.ui.components.EmptyState
+import com.braveboy.hesabi.ui.components.ForecastCard
 import com.braveboy.hesabi.ui.components.GoalDepositWithdrawDialog
 import com.braveboy.hesabi.ui.components.MonthSwitcher
 import com.braveboy.hesabi.ui.components.MonthlySalaryLiquidityCard
@@ -80,10 +87,15 @@ fun HomeScreen(
     onOpenBudget: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenVoice: () -> Unit = {},
+    onOpenAssistant: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: HomeViewModel = hesabiViewModel(container)
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshIfMonthChanged()
+        onPauseOrDispose { }
+    }
 
     var activeGoalForDeposit by remember { mutableStateOf<SavingsGoal?>(null) }
     var activeGoalForEdit by remember { mutableStateOf<SavingsGoal?>(null) }
@@ -102,6 +114,7 @@ fun HomeScreen(
         onOpenBudget = onOpenBudget,
         onOpenSettings = onOpenSettings,
         onOpenVoice = onOpenVoice,
+        onOpenAssistant = onOpenAssistant,
         onOpenSalarySetup = { showSalaryDialog = true },
         onAddGoal = { showCreateGoalDialog = true },
         onGoalClick = { goal -> activeGoalForDeposit = goal },
@@ -166,6 +179,7 @@ fun HomeContent(
     onOpenBudget: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenVoice: () -> Unit = {},
+    onOpenAssistant: () -> Unit = {},
     onOpenSalarySetup: () -> Unit = {},
     onAddGoal: () -> Unit = {},
     onGoalClick: (SavingsGoal) -> Unit = {},
@@ -265,6 +279,22 @@ fun HomeContent(
                     }
 
                     Surface(
+                        onClick = onOpenAssistant,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(38.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome,
+                                contentDescription = "دستیار مالی",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                    }
+
+                    Surface(
                         onClick = onOpenSettings,
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -342,6 +372,11 @@ fun HomeContent(
                     safeToSpend = state.safeToSpend,
                     onClick = onOpenBudget,
                 )
+            }
+        }
+        state.forecast?.let { forecast ->
+            item {
+                ForecastCard(forecast = forecast)
             }
         }
         if (state.pendingSmsCount > 0) {
@@ -423,7 +458,12 @@ private fun QuickAction(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(76.dp),
+        modifier = modifier
+            .height(76.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            },
         shape = MaterialTheme.shapes.medium,
         color = color.copy(alpha = 0.1f),
     ) {

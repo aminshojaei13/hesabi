@@ -2,7 +2,10 @@ package com.braveboy.hesabi.domain.repository
 
 import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.AccountWithBalance
+import com.braveboy.hesabi.domain.model.AppEvent
 import com.braveboy.hesabi.domain.model.AppSettings
+import com.braveboy.hesabi.domain.model.Asset
+import com.braveboy.hesabi.domain.model.AssetPriceSnapshot
 import com.braveboy.hesabi.domain.model.BackupSummary
 import com.braveboy.hesabi.domain.model.Budget
 import com.braveboy.hesabi.domain.model.Category
@@ -15,7 +18,9 @@ import com.braveboy.hesabi.domain.model.Loan
 import com.braveboy.hesabi.domain.model.LoanWithInstallments
 import com.braveboy.hesabi.domain.model.Person
 import com.braveboy.hesabi.domain.model.PersonWithDebts
+import com.braveboy.hesabi.domain.model.QuickTemplate
 import com.braveboy.hesabi.domain.model.RecurringTransaction
+import com.braveboy.hesabi.domain.model.SavingsDeposit
 import com.braveboy.hesabi.domain.model.SavingsGoal
 import com.braveboy.hesabi.domain.model.SenderRule
 import com.braveboy.hesabi.domain.model.SmsEvent
@@ -47,12 +52,20 @@ interface TransactionRepository {
     fun observeAll(): Flow<List<Transaction>>
     fun observeBetween(start: Long, endExclusive: Long): Flow<List<Transaction>>
     fun observeRecent(limit: Int): Flow<List<Transaction>>
+    fun observeTrash(): Flow<List<Transaction>>
     suspend fun getBetween(start: Long, endExclusive: Long): List<Transaction>
     suspend fun getAll(): List<Transaction>
+    suspend fun getAllIncludingDeleted(): List<Transaction>
     suspend fun getById(id: String): Transaction?
+    suspend fun findByExternalRef(ref: String): Transaction?
+    suspend fun findByLinkedEntity(type: String, id: String): List<Transaction>
     suspend fun save(transaction: Transaction)
     suspend fun saveAll(transactions: List<Transaction>)
+    /** Moves the row to the recycle bin (30 days) instead of destroying it. */
     suspend fun delete(id: String)
+    suspend fun restore(id: String)
+    suspend fun deletePermanently(id: String)
+    suspend fun purgeTrash(olderThanMillis: Long): Int
     suspend fun countForCategory(categoryId: String): Int
     suspend fun countForAccount(accountId: String): Int
 }
@@ -67,12 +80,13 @@ interface BudgetRepository {
 interface SavingsGoalRepository {
     fun observeAll(): Flow<List<SavingsGoal>>
     fun observeActive(): Flow<List<SavingsGoal>>
+    fun observeDeposits(goalId: String): Flow<List<SavingsDeposit>>
     suspend fun getAll(): List<SavingsGoal>
     suspend fun getById(id: String): SavingsGoal?
     suspend fun save(goal: SavingsGoal)
     suspend fun delete(id: String)
-    suspend fun deposit(goalId: String, amountToman: Long)
-    suspend fun withdraw(goalId: String, amountToman: Long)
+    suspend fun deposit(goalId: String, amountToman: Long, note: String = "")
+    suspend fun withdraw(goalId: String, amountToman: Long, note: String = "")
 }
 
 data class SmsAcceptInput(
@@ -80,6 +94,7 @@ data class SmsAcceptInput(
     val type: TransactionType,
     val amountToman: Long,
     val accountId: String,
+    val toAccountId: String? = null,
     val categoryId: String?,
     val occurredOnEpochDay: Long,
     val note: String,
@@ -122,11 +137,17 @@ interface SettingsRepository {
     suspend fun setPaydayDayOfMonth(day: Int)
     suspend fun setAppLockEnabled(enabled: Boolean)
     suspend fun setPinCodeHash(hash: String)
+    suspend fun setPinFailedAttempts(attempts: Int)
+    suspend fun setPinLockedUntil(millis: Long)
     suspend fun setBiometricEnabled(enabled: Boolean)
     suspend fun setRemindersEnabled(enabled: Boolean)
     suspend fun setMonthlySalary(amountToman: Long)
     suspend fun setSalaryAccountId(id: String?)
     suspend fun setAutoDepositSalary(enabled: Boolean)
+    suspend fun setAiMode(mode: com.braveboy.hesabi.domain.model.AiMode)
+    suspend fun setLastAssistantUseAt(millis: Long)
+    suspend fun setSmsRationaleAccepted(accepted: Boolean)
+    suspend fun setAssetPricesAutoUpdate(enabled: Boolean)
 }
 
 interface PersonRepository {
@@ -181,8 +202,40 @@ interface RecurringTransactionRepository {
     suspend fun toggleActive(id: String, isActive: Boolean)
 }
 
+enum class BackupImportMode { REPLACE, MERGE }
+
 interface BackupRepository {
     suspend fun exportEncrypted(out: OutputStream, password: CharArray): BackupSummary
-    suspend fun importEncrypted(input: InputStream, password: CharArray): ImportResult
+    suspend fun importEncrypted(
+        input: InputStream,
+        password: CharArray,
+        mode: BackupImportMode = BackupImportMode.REPLACE,
+    ): ImportResult
     suspend fun exportCsv(out: OutputStream): Int
+}
+
+
+interface QuickTemplateRepository {
+    fun observeAll(): Flow<List<QuickTemplate>>
+    suspend fun getAll(): List<QuickTemplate>
+    suspend fun save(template: QuickTemplate)
+    suspend fun delete(id: String)
+    suspend fun markUsed(id: String)
+}
+
+interface AssetRepository {
+    fun observeAll(): Flow<List<Asset>>
+    fun observeSnapshots(): Flow<List<AssetPriceSnapshot>>
+    suspend fun getAll(): List<Asset>
+    suspend fun getById(id: String): Asset?
+    suspend fun save(asset: Asset, recordSnapshot: Boolean = true)
+    suspend fun delete(id: String)
+    suspend fun updatePrice(assetId: String, priceTomanPerUnit: Long, source: String, atMillis: Long)
+}
+
+/** Local-only, anonymous product diagnostics. */
+interface DiagnosticsRepository {
+    suspend fun record(type: String, name: String, metadata: String = "")
+    suspend fun recent(): List<AppEvent>
+    suspend fun clear()
 }

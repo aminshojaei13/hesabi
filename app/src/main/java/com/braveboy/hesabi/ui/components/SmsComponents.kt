@@ -120,9 +120,10 @@ fun SmsReviewCard(
                     )
                 }
                 Text(
-                    text = buildString {
-                        append("دسته: ")
-                        append(categoryName ?: "انتخاب نشده")
+                    text = if (event.type == TransactionType.TRANSFER) {
+                        "انتقال بین حساب‌ها"
+                    } else {
+                        "دسته: " + (categoryName ?: "انتخاب نشده")
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

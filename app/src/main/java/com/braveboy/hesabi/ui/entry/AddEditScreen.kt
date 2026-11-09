@@ -72,6 +72,7 @@ import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.JalaliDatePickerDialog
 import com.braveboy.hesabi.ui.receipt.ReceiptImageViewerDialog
+import com.braveboy.hesabi.ui.security.SecureScreen
 import com.braveboy.hesabi.ui.theme.HesabiRadius
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import kotlinx.coroutines.launch
@@ -142,6 +143,7 @@ fun AddEditContent(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SecureScreen()
     var showDatePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showReceiptViewer by remember { mutableStateOf(false) }
@@ -152,8 +154,15 @@ fun AddEditContent(
     ) { uri ->
         if (uri != null) {
             scope.launch {
+                val previous = state.draft.receiptImagePath
                 val path = ReceiptStorageManager.saveReceiptFromUri(context, uri)
-                onReceiptImageChange(path)
+                if (path != null) {
+                    // Replacing a receipt must not leave the old encrypted file behind.
+                    if (!previous.isNullOrBlank() && previous != path) {
+                        ReceiptStorageManager.deleteReceiptFile(previous)
+                    }
+                    onReceiptImageChange(path)
+                }
             }
         }
     }
@@ -346,10 +355,15 @@ fun AddEditContent(
                                     IconButton(onClick = { showReceiptViewer = true }) {
                                         Icon(Icons.Rounded.Visibility, contentDescription = "مشاهده")
                                     }
-                                    IconButton(onClick = { onReceiptImageChange(null) }) {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            ReceiptStorageManager.deleteReceiptFile(currentPath)
+                                            onReceiptImageChange(null)
+                                        }
+                                    }) {
                                         Icon(
                                             Icons.Rounded.DeleteOutline,
-                                            contentDescription = "حذف",
+                                            contentDescription = "حذف تصویر رسید",
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -424,7 +438,10 @@ fun AddEditContent(
             imagePath = draft.receiptImagePath,
             onDismiss = { showReceiptViewer = false },
             onDelete = {
-                onReceiptImageChange(null)
+                scope.launch {
+                    ReceiptStorageManager.deleteReceiptFile(draft.receiptImagePath)
+                    onReceiptImageChange(null)
+                }
                 showReceiptViewer = false
             },
         )

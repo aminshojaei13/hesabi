@@ -48,6 +48,7 @@ enum class TransactionSource {
     QUICK_REPEAT,
     VOICE,
     RECURRING,
+    ASSISTANT,
 }
 
 data class Transaction(
@@ -65,11 +66,25 @@ data class Transaction(
     val receiptImagePath: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = createdAtMillis,
+    /** Non-null means the row sits in the recycle bin until this time + 30 days. */
+    val deletedAtMillis: Long? = null,
+    /** `debt`, `installment` or `cheque` when this entry settles a commitment. */
+    val linkedEntityType: String? = null,
+    val linkedEntityId: String? = null,
 ) {
     val occurredOn: JalaliDate get() = JalaliDate.fromEpochDay(occurredOnEpochDay)
 
     /** Transfers move money, they are never income or expense. */
     val affectsIncomeExpense: Boolean get() = type != TransactionType.TRANSFER
+
+    val isDeleted: Boolean get() = deletedAtMillis != null
+}
+
+/** Keeps the link between a cash movement and the commitment it settles. */
+object LinkedEntityType {
+    const val DEBT = "debt"
+    const val INSTALLMENT = "installment"
+    const val CHEQUE = "cheque"
 }
 
 /** A budget is defined for one Persian month; empty [categoryId] means the whole month. */
@@ -78,6 +93,8 @@ data class Budget(
     val categoryId: String = "",
     val periodKey: String,
     val limitToman: Long,
+    /** When true, the unused part of last month's envelope moves into this one. */
+    val rolloverEnabled: Boolean = false,
 ) {
     fun periodOrNull(): MonthPeriod? = MonthPeriod.fromKey(periodKey)
 }
@@ -131,6 +148,8 @@ data class SavingsGoal(
     val targetDateEpochDay: Long? = null,
     val isCompleted: Boolean = false,
     val createdAtMillis: Long = System.currentTimeMillis(),
+    /** 0 means "no monthly challenge target". */
+    val monthlyTargetToman: Long = 0L,
 ) {
     val progress: Float
         get() = if (targetAmountToman > 0) (savedAmountToman.toFloat() / targetAmountToman).coerceIn(0f, 1f) else 0f
@@ -312,3 +331,86 @@ data class RecurringTransaction(
     val note: String = "",
     val createdAtMillis: Long = System.currentTimeMillis(),
 )
+
+
+/** A one-tap shortcut on the quick-entry screen ("قهوه", "تاکسی"). */
+data class QuickTemplate(
+    val id: String,
+    val label: String,
+    val type: TransactionType = TransactionType.EXPENSE,
+    val amountToman: Long = 0L,
+    val categoryId: String? = null,
+    val accountId: String? = null,
+    val toAccountId: String? = null,
+    val note: String = "",
+    val usageCount: Int = 0,
+    val sortOrder: Int = 0,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+enum class AssetKind(val labelFa: String) {
+    GOLD("طلا و سکه"),
+    CURRENCY("ارز"),
+    CRYPTO("رمزارز"),
+    VEHICLE("خودرو"),
+    PROPERTY("ملک"),
+    FUND("صندوق و سهام"),
+    OTHER("سایر"),
+}
+
+/**
+ * A non-cash holding. Quantity is stored multiplied by 1000 so grams of gold and
+ * foreign currency can be fractional without ever using floating point money.
+ */
+data class Asset(
+    val id: String,
+    val name: String,
+    val kind: AssetKind,
+    val quantityMilli: Long,
+    val unitLabel: String,
+    val buyPriceTomanPerUnit: Long,
+    val currentPriceTomanPerUnit: Long,
+    val priceUpdatedAtMillis: Long = 0L,
+    val priceSourceLabel: String = "ورود دستی",
+    val note: String = "",
+    val archived: Boolean = false,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+) {
+    val quantity: Double get() = quantityMilli / 1000.0
+    val costToman: Long get() = (quantityMilli * buyPriceTomanPerUnit) / 1000
+    val currentValueToman: Long get() = (quantityMilli * currentPriceTomanPerUnit) / 1000
+    val profitToman: Long get() = currentValueToman - costToman
+    val profitPercent: Double? get() = if (costToman > 0) profitToman * 100.0 / costToman else null
+}
+
+data class AssetPriceSnapshot(
+    val id: String,
+    val assetId: String,
+    val priceTomanPerUnit: Long,
+    val recordedAtMillis: Long,
+)
+
+/** Audit trail for savings deposits/withdrawals, used by goals and challenges. */
+data class SavingsDeposit(
+    val id: String,
+    val goalId: String,
+    val amountToman: Long,
+    val isWithdrawal: Boolean = false,
+    val occurredOnEpochDay: Long = JalaliDate.today().toEpochDay(),
+    val note: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+/** Local, anonymous diagnostics. Never contains financial values or free text. */
+data class AppEvent(
+    val id: String,
+    val type: String,
+    val name: String,
+    val metadata: String = "",
+    val occurredAtMillis: Long = System.currentTimeMillis(),
+)
+
+enum class AiMode(val labelFa: String) {
+    LOCAL("فقط روی گوشی"),
+    CLOUD("ابر (اختیاری)"),
+}

@@ -19,10 +19,19 @@ data class BackupEnvelope(
     val loans: List<LoanDto> = emptyList(),
     val installments: List<InstallmentDto> = emptyList(),
     val recurringTransactions: List<RecurringTransactionDto> = emptyList(),
+    val quickTemplates: List<QuickTemplateDto> = emptyList(),
+    val assets: List<AssetDto> = emptyList(),
+    val assetPriceSnapshots: List<AssetPriceSnapshotDto> = emptyList(),
+    val savingsDeposits: List<SavingsDepositDto> = emptyList(),
+    val smsEvents: List<SmsEventDto> = emptyList(),
+    val senderRules: List<SenderRuleDto> = emptyList(),
+    val receipts: List<ReceiptDto> = emptyList(),
+    /** Non-secret settings only; PIN and lock state are deliberately excluded. */
+    val settings: SettingsDto? = null,
 ) {
     companion object {
         const val MAGIC = "hesabi-backup"
-        const val SCHEMA = 5
+        const val SCHEMA = 6
     }
 }
 
@@ -63,6 +72,9 @@ data class TransactionDto(
     val receiptImagePath: String? = null,
     val createdAtMillis: Long = 0,
     val updatedAtMillis: Long = 0,
+    val deletedAtMillis: Long? = null,
+    val linkedEntityType: String? = null,
+    val linkedEntityId: String? = null,
 )
 
 @Serializable
@@ -71,6 +83,7 @@ data class BudgetDto(
     val categoryId: String = "",
     val periodKey: String,
     val limitToman: Long,
+    val rolloverEnabled: Boolean = false,
 )
 
 @Serializable
@@ -84,6 +97,7 @@ data class SavingsGoalDto(
     val targetDateEpochDay: Long? = null,
     val isCompleted: Boolean = false,
     val createdAtMillis: Long = 0,
+    val monthlyTargetToman: Long = 0,
 )
 
 @Serializable
@@ -165,4 +179,105 @@ data class RecurringTransactionDto(
     val isActive: Boolean = true,
     val note: String = "",
     val createdAtMillis: Long = 0,
+)
+
+
+@Serializable
+data class QuickTemplateDto(
+    val id: String,
+    val label: String,
+    val type: String,
+    val amountToman: Long,
+    val categoryId: String? = null,
+    val accountId: String? = null,
+    val toAccountId: String? = null,
+    val note: String = "",
+    val usageCount: Int = 0,
+    val sortOrder: Int = 0,
+    val createdAtMillis: Long = 0,
+)
+
+@Serializable
+data class AssetDto(
+    val id: String,
+    val name: String,
+    val kind: String,
+    val quantityMilli: Long,
+    val unitLabel: String,
+    val buyPriceTomanPerUnit: Long,
+    val currentPriceTomanPerUnit: Long,
+    val priceUpdatedAtMillis: Long = 0,
+    val priceSourceLabel: String = "ورود دستی",
+    val note: String = "",
+    val archived: Boolean = false,
+    val createdAtMillis: Long = 0,
+)
+
+@Serializable
+data class AssetPriceSnapshotDto(
+    val id: String,
+    val assetId: String,
+    val priceTomanPerUnit: Long,
+    val recordedAtMillis: Long,
+)
+
+@Serializable
+data class SavingsDepositDto(
+    val id: String,
+    val goalId: String,
+    val amountToman: Long,
+    val isWithdrawal: Boolean = false,
+    val occurredOnEpochDay: Long,
+    val note: String = "",
+    val createdAtMillis: Long = 0,
+)
+
+@Serializable
+data class SmsEventDto(
+    val id: String,
+    val sender: String,
+    val body: String,
+    val receivedAtMillis: Long,
+    val rawHash: String,
+    val amountToman: Long? = null,
+    val type: String? = null,
+    val last4: String? = null,
+    val occurredOnEpochDay: Long,
+    val merchant: String? = null,
+    val confidence: Float = 0f,
+    val status: String = "PENDING",
+    val duplicateOfTransactionId: String? = null,
+)
+
+@Serializable
+data class SenderRuleDto(
+    val sender: String,
+    val ignored: Boolean = true,
+)
+
+@Serializable
+data class ReceiptDto(
+    /** Original absolute path; used only to remap transactions on restore. */
+    val path: String,
+    /** Base64 of the decrypted WebP bytes. */
+    val base64: String,
+)
+
+@Serializable
+data class SettingsDto(
+    val onboarded: Boolean = true,
+    val themeMode: String = "SYSTEM",
+    val dynamicColor: Boolean = false,
+    val currency: String = "TOMAN",
+    val hideAmounts: Boolean = false,
+    val smsCaptureEnabled: Boolean = false,
+    val amountsAreRial: Boolean = true,
+    val paydayDayOfMonth: Int = 1,
+    val remindersEnabled: Boolean = true,
+    val monthlySalaryToman: Long = 0,
+    val salaryAccountId: String? = null,
+    val autoDepositSalary: Boolean = false,
+    val aiMode: String = "LOCAL",
+    val smsRationaleAccepted: Boolean = false,
+    val assetPricesAutoUpdate: Boolean = false,
 )

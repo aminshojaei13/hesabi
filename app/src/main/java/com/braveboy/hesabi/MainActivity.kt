@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
 
     private var initialSettings by mutableStateOf<AppSettings?>(null)
     private var sharedText by mutableStateOf<String?>(null)
+    private var openSmsRequested by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -38,6 +39,10 @@ class MainActivity : ComponentActivity() {
         }
 
         sharedText = intent.readSharedText()
+        openSmsRequested = intent.getBooleanExtra(
+            com.braveboy.hesabi.data.sms.SmsNotifier.EXTRA_OPEN_SMS,
+            false,
+        )
 
         val ready = mutableStateOf(false)
         splash.setKeepOnScreenCondition { !ready.value }
@@ -61,6 +66,8 @@ class MainActivity : ComponentActivity() {
                         initialSettings = loaded,
                         sharedText = sharedText,
                         onSharedTextConsumed = { sharedText = null },
+                        openSmsRequested = openSmsRequested,
+                        onOpenSmsConsumed = { openSmsRequested = false },
                     )
                 }
             }
@@ -71,6 +78,10 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         sharedText = intent.readSharedText()
+        openSmsRequested = intent.getBooleanExtra(
+            com.braveboy.hesabi.data.sms.SmsNotifier.EXTRA_OPEN_SMS,
+            false,
+        )
     }
 }
 

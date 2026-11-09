@@ -1,5 +1,6 @@
 package com.braveboy.hesabi.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -39,6 +40,8 @@ data class CategoryEntity(
         Index(value = ["accountId", "occurredOnEpochDay"]),
         Index("categoryId"),
         Index(value = ["externalRef"], unique = true),
+        Index("deletedAtMillis"),
+        Index("linkedEntityId"),
     ],
 )
 data class TransactionEntity(
@@ -55,6 +58,11 @@ data class TransactionEntity(
     val receiptImagePath: String? = null,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    /** Soft-delete marker. Rows stay 30 days in the recycle bin before being purged. */
+    val deletedAtMillis: Long? = null,
+    /** Optional link to a debt, cheque or loan installment. */
+    val linkedEntityType: String? = null,
+    val linkedEntityId: String? = null,
 )
 
 @Entity(
@@ -66,6 +74,8 @@ data class BudgetEntity(
     val categoryId: String,
     val periodKey: String,
     val limitToman: Long,
+    @ColumnInfo(defaultValue = "0")
+    val rolloverEnabled: Boolean = false,
 )
 
 @Entity(
@@ -108,6 +118,8 @@ data class SavingsGoalEntity(
     val targetDateEpochDay: Long?,
     val isCompleted: Boolean,
     val createdAtMillis: Long,
+    @ColumnInfo(defaultValue = "0")
+    val monthlyTargetToman: Long = 0L,
 )
 
 @Entity(
@@ -223,6 +235,83 @@ data class RecurringTransactionEntity(
     val lastAppliedEpochDay: Long?,
     val autoApply: Boolean,
     val isActive: Boolean,
+    val note: String,
+    val createdAtMillis: Long,
+)
+
+
+@Entity(
+    tableName = "quick_templates",
+    indices = [Index("type"), Index("sortOrder")],
+)
+data class QuickTemplateEntity(
+    @PrimaryKey val id: String,
+    val label: String,
+    val type: String,
+    val amountToman: Long,
+    val categoryId: String?,
+    val accountId: String?,
+    val toAccountId: String?,
+    val note: String,
+    val usageCount: Int,
+    val sortOrder: Int,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "assets",
+    indices = [Index("kind"), Index("archived"), Index("createdAtMillis")],
+)
+data class AssetEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val kind: String,
+    /** Quantity multiplied by 1000, so 1.5 grams is stored as 1500. */
+    val quantityMilli: Long,
+    val unitLabel: String,
+    val buyPriceTomanPerUnit: Long,
+    val currentPriceTomanPerUnit: Long,
+    val priceUpdatedAtMillis: Long,
+    val priceSourceLabel: String,
+    val note: String,
+    val archived: Boolean,
+    val createdAtMillis: Long,
+)
+
+@Entity(
+    tableName = "asset_price_snapshots",
+    indices = [Index("assetId"), Index("recordedAtMillis")],
+)
+data class AssetPriceSnapshotEntity(
+    @PrimaryKey val id: String,
+    val assetId: String,
+    val priceTomanPerUnit: Long,
+    val recordedAtMillis: Long,
+)
+
+@Entity(
+    tableName = "app_events",
+    indices = [Index("type"), Index("occurredAtMillis")],
+)
+data class AppEventEntity(
+    @PrimaryKey val id: String,
+    val type: String,
+    val name: String,
+    /** Never contains amounts, notes, phone numbers or SMS bodies. */
+    val metadata: String,
+    val occurredAtMillis: Long,
+)
+
+@Entity(
+    tableName = "savings_deposits",
+    indices = [Index("goalId"), Index("occurredOnEpochDay")],
+)
+data class SavingsDepositEntity(
+    @PrimaryKey val id: String,
+    val goalId: String,
+    val amountToman: Long,
+    val isWithdrawal: Boolean,
+    val occurredOnEpochDay: Long,
     val note: String,
     val createdAtMillis: Long,
 )

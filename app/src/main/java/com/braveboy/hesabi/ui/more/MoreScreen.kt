@@ -9,7 +9,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -55,6 +63,14 @@ fun MoreScreen(
     onSms: () -> Unit,
     onBackup: () -> Unit,
     onSettings: () -> Unit,
+    onAssistant: () -> Unit = {},
+    onAssets: () -> Unit = {},
+    onTrash: () -> Unit = {},
+    onImport: () -> Unit = {},
+    onMyData: () -> Unit = {},
+    onAnnual: () -> Unit = {},
+    onCalendar: () -> Unit = {},
+    onSimulator: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showAbout by remember { mutableStateOf(false) }
@@ -68,6 +84,14 @@ fun MoreScreen(
         onSms = onSms,
         onBackup = onBackup,
         onSettings = onSettings,
+        onAssistant = onAssistant,
+        onAssets = onAssets,
+        onTrash = onTrash,
+        onImport = onImport,
+        onMyData = onMyData,
+        onAnnual = onAnnual,
+        onCalendar = onCalendar,
+        onSimulator = onSimulator,
         onAbout = { showAbout = true },
         modifier = modifier,
     )
@@ -96,6 +120,14 @@ fun MoreContent(
     onBackup: () -> Unit,
     onSettings: () -> Unit,
     onAbout: () -> Unit,
+    onAssistant: () -> Unit = {},
+    onAssets: () -> Unit = {},
+    onTrash: () -> Unit = {},
+    onImport: () -> Unit = {},
+    onMyData: () -> Unit = {},
+    onAnnual: () -> Unit = {},
+    onCalendar: () -> Unit = {},
+    onSimulator: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -152,6 +184,42 @@ fun MoreContent(
         }
         MenuCard {
             SettingsRow(
+                title = "دستیار مالی",
+                subtitle = "ثبت با جمله و پرسش‌های مالی، کاملاً محلی",
+                icon = Icons.Rounded.AutoAwesome,
+                onClick = onAssistant,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "دارایی‌ها",
+                subtitle = "طلا، ارز، ملک و سود/زیان",
+                icon = Icons.Rounded.AccountBalance,
+                onClick = onAssets,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "تقویم سررسید",
+                subtitle = "نمای ماهانهٔ چک، قسط و تعهدات",
+                icon = Icons.Rounded.CalendarMonth,
+                onClick = onCalendar,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "می‌توانم بخرم؟",
+                subtitle = "اثر خرید روی خرج امن",
+                icon = Icons.Rounded.Calculate,
+                onClick = onSimulator,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "حساب سال من",
+                subtitle = "گزارش سالانه و خروجی PDF/Excel",
+                icon = Icons.Rounded.Insights,
+                onClick = onAnnual,
+            )
+        }
+        MenuCard {
+            SettingsRow(
                 title = "پیامک‌های بانکی",
                 subtitle = "ثبت خودکار اختیاری، بدون خواندن دفتر پیامک",
                 icon = Icons.Rounded.Sms,
@@ -163,12 +231,33 @@ fun MoreContent(
             RowDivider()
             SettingsRow(
                 title = "پشتیبان و خروجی",
-                subtitle = "فایل رمزدار یا CSV",
+                subtitle = "فایل رمزدار، CSV، PDF و Excel",
                 icon = Icons.Rounded.Backup,
                 onClick = onBackup,
             )
+            RowDivider()
+            SettingsRow(
+                title = "ورود از فایل",
+                subtitle = "مهاجرت از CSV یا اکسل",
+                icon = Icons.Rounded.UploadFile,
+                onClick = onImport,
+            )
+            RowDivider()
+            SettingsRow(
+                title = "سطل بازیافت",
+                subtitle = "بازگردانی ۳۰ روزهٔ تراکنش‌ها",
+                icon = Icons.Rounded.DeleteForever,
+                onClick = onTrash,
+            )
         }
         MenuCard {
+            SettingsRow(
+                title = "دادهٔ من کجاست؟",
+                subtitle = "شفافیت داده، رمزنگاری و حذف کامل",
+                icon = Icons.Rounded.Lock,
+                onClick = onMyData,
+            )
+            RowDivider()
             SettingsRow(
                 title = "تنظیمات",
                 subtitle = "ظاهر، واحد پول و حریم خصوصی",

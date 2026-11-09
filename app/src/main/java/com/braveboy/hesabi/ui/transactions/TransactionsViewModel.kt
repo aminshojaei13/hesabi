@@ -22,6 +22,8 @@ data class TransactionFilter(
     val period: MonthPeriod = MonthPeriod.current(),
     val allPeriods: Boolean = false,
     val type: TransactionType? = null,
+    val accountId: String? = null,
+    val categoryId: String? = null,
     val query: String = "",
 )
 
@@ -70,6 +72,9 @@ class TransactionsViewModel(
         val filtered = data.transactions.filter { tx ->
             val periodOk = currentFilter.allPeriods || currentFilter.period.contains(tx.occurredOnEpochDay)
             val typeOk = currentFilter.type == null || tx.type == currentFilter.type
+            val accountOk = currentFilter.accountId == null ||
+                tx.accountId == currentFilter.accountId || tx.toAccountId == currentFilter.accountId
+            val categoryOk = currentFilter.categoryId == null || tx.categoryId == currentFilter.categoryId
             val queryOk = query.isEmpty() || run {
                 val categoryName = categoryById[tx.categoryId]?.name.orEmpty()
                 val accountName = accountById[tx.accountId]?.name.orEmpty()
@@ -77,7 +82,7 @@ class TransactionsViewModel(
                 val haystack = Digits.toAscii("${tx.note} $categoryName $accountName $toName").lowercase()
                 haystack.contains(query.lowercase())
             }
-            periodOk && typeOk && queryOk
+            periodOk && typeOk && accountOk && categoryOk && queryOk
         }.sortedWith(
             compareByDescending<Transaction> { it.occurredOnEpochDay }.thenByDescending { it.createdAtMillis },
         )
@@ -99,6 +104,14 @@ class TransactionsViewModel(
 
     fun setType(type: TransactionType?) {
         filter.value = filter.value.copy(type = type)
+    }
+
+    fun setAccount(accountId: String?) {
+        filter.value = filter.value.copy(accountId = accountId)
+    }
+
+    fun setCategory(categoryId: String?) {
+        filter.value = filter.value.copy(categoryId = categoryId)
     }
 
     fun toggleAllPeriods() {

@@ -3,6 +3,8 @@ package com.braveboy.hesabi.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.braveboy.hesabi.core.money.Currency
+import com.braveboy.hesabi.core.security.SecurityManager
+import com.braveboy.hesabi.domain.model.AiMode
 import com.braveboy.hesabi.domain.model.AppSettings
 import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.ThemeMode
@@ -63,9 +65,21 @@ class SettingsViewModel(
         settingsRepository.setAppLockEnabled(hash.isNotBlank())
     }
 
+    /** Disables the lock only after the caller verified the current PIN. */
+    fun disableAppLockAfterVerification(currentPin: String, legacyHash: Boolean) {
+        viewModelScope.launch {
+            if (legacyHash) {
+                settingsRepository.setPinCodeHash(SecurityManager.hashPin(currentPin))
+            }
+            settingsRepository.setAppLockEnabled(false)
+        }
+    }
+
     fun setBiometricEnabled(enabled: Boolean) = launchSetting { settingsRepository.setBiometricEnabled(enabled) }
 
     fun setRemindersEnabled(enabled: Boolean) = launchSetting { settingsRepository.setRemindersEnabled(enabled) }
+
+    fun setAiMode(mode: AiMode) = launchSetting { settingsRepository.setAiMode(mode) }
 
     fun setMonthlySalary(amountToman: Long) = launchSetting { settingsRepository.setMonthlySalary(amountToman) }
 

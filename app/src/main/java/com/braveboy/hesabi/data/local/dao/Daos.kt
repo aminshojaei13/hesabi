@@ -7,6 +7,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.braveboy.hesabi.data.local.entity.AccountEntity
+import com.braveboy.hesabi.data.local.entity.AppEventEntity
+import com.braveboy.hesabi.data.local.entity.AssetEntity
+import com.braveboy.hesabi.data.local.entity.AssetPriceSnapshotEntity
 import com.braveboy.hesabi.data.local.entity.BudgetEntity
 import com.braveboy.hesabi.data.local.entity.CategoryEntity
 import com.braveboy.hesabi.data.local.entity.ChequeEntity
@@ -14,7 +17,9 @@ import com.braveboy.hesabi.data.local.entity.DebtEntity
 import com.braveboy.hesabi.data.local.entity.InstallmentEntity
 import com.braveboy.hesabi.data.local.entity.LoanEntity
 import com.braveboy.hesabi.data.local.entity.PersonEntity
+import com.braveboy.hesabi.data.local.entity.QuickTemplateEntity
 import com.braveboy.hesabi.data.local.entity.RecurringTransactionEntity
+import com.braveboy.hesabi.data.local.entity.SavingsDepositEntity
 import com.braveboy.hesabi.data.local.entity.SavingsGoalEntity
 import com.braveboy.hesabi.data.local.entity.SenderRuleEntity
 import com.braveboy.hesabi.data.local.entity.SmsEventEntity
@@ -83,26 +88,46 @@ interface CategoryDao {
 
 @Dao
 interface TransactionDao {
-    @Query("SELECT * FROM transactions ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC")
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NULL " +
+            "ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC",
+    )
     fun observeAll(): Flow<List<TransactionEntity>>
 
     @Query(
-        "SELECT * FROM transactions WHERE occurredOnEpochDay >= :start AND occurredOnEpochDay < :end " +
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NULL " +
+            "AND occurredOnEpochDay >= :start AND occurredOnEpochDay < :end " +
             "ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC",
     )
     fun observeBetween(start: Long, end: Long): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC LIMIT :limit")
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NULL " +
+            "ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC LIMIT :limit",
+    )
     fun observeRecent(limit: Int): Flow<List<TransactionEntity>>
 
     @Query(
-        "SELECT * FROM transactions WHERE occurredOnEpochDay >= :start AND occurredOnEpochDay < :end " +
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NOT NULL " +
+            "ORDER BY deletedAtMillis DESC",
+    )
+    fun observeTrash(): Flow<List<TransactionEntity>>
+
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NULL " +
+            "AND occurredOnEpochDay >= :start AND occurredOnEpochDay < :end " +
             "ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC",
     )
     suspend fun getBetween(start: Long, end: Long): List<TransactionEntity>
 
-    @Query("SELECT * FROM transactions ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC")
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAtMillis IS NULL " +
+            "ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC",
+    )
     suspend fun getAll(): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC")
+    suspend fun getAllIncludingDeleted(): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun findById(id: String): TransactionEntity?
@@ -110,10 +135,16 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE externalRef = :ref LIMIT 1")
     suspend fun findByExternalRef(ref: String): TransactionEntity?
 
-    @Query("SELECT COUNT(*) FROM transactions WHERE categoryId = :categoryId")
+    @Query("SELECT * FROM transactions WHERE linkedEntityType = :type AND linkedEntityId = :id AND deletedAtMillis IS NULL")
+    suspend fun findByLinkedEntity(type: String, id: String): List<TransactionEntity>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAtMillis IS NULL AND categoryId = :categoryId")
     suspend fun countForCategory(categoryId: String): Int
 
-    @Query("SELECT COUNT(*) FROM transactions WHERE accountId = :accountId OR toAccountId = :accountId")
+    @Query(
+        "SELECT COUNT(*) FROM transactions WHERE deletedAtMillis IS NULL " +
+            "AND (accountId = :accountId OR toAccountId = :accountId)",
+    )
     suspend fun countForAccount(accountId: String): Int
 
     @Upsert
@@ -122,14 +153,32 @@ interface TransactionDao {
     @Upsert
     suspend fun upsertAll(transactions: List<TransactionEntity>)
 
+    @Query("UPDATE transactions SET deletedAtMillis = :deletedAtMillis WHERE id = :id")
+    suspend fun softDelete(id: String, deletedAtMillis: Long)
+
+    @Query("UPDATE transactions SET deletedAtMillis = NULL WHERE id = :id")
+    suspend fun restore(id: String)
+
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM transactions WHERE deletedAtMillis IS NOT NULL AND deletedAtMillis < :beforeMillis")
+    suspend fun purgeExpired(beforeMillis: Long): Int
 
     @Query("DELETE FROM transactions")
     suspend fun deleteAll()
 
-    @Query("SELECT COUNT(*) FROM transactions")
+    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAtMillis IS NULL")
     suspend fun count(): Int
+
+    @Query(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' AND accountId = :accountId THEN amountToman " +
+            "WHEN type = 'EXPENSE' AND accountId = :accountId THEN -amountToman " +
+            "WHEN type = 'TRANSFER' AND accountId = :accountId THEN -amountToman " +
+            "WHEN type = 'TRANSFER' AND toAccountId = :accountId THEN amountToman ELSE 0 END), 0) " +
+            "FROM transactions WHERE deletedAtMillis IS NULL",
+    )
+    suspend fun balanceDeltaForAccount(accountId: String): Long
 }
 
 @Dao
@@ -172,6 +221,9 @@ interface SmsDao {
 
     @Query("SELECT * FROM sms_events WHERE rawHash = :hash")
     suspend fun findByHash(hash: String): SmsEventEntity?
+
+    @Query("SELECT * FROM sms_events ORDER BY receivedAtMillis ASC")
+    suspend fun getAll(): List<SmsEventEntity>
 
     @Query("SELECT COUNT(*) FROM sms_events WHERE status = 'PENDING'")
     fun observePendingCount(): Flow<Int>
@@ -432,5 +484,129 @@ interface RecurringTransactionDao {
     suspend fun deleteById(id: String)
 
     @Query("DELETE FROM recurring_transactions")
+    suspend fun deleteAll()
+}
+
+
+@Dao
+interface QuickTemplateDao {
+    @Query("SELECT * FROM quick_templates ORDER BY usageCount DESC, sortOrder ASC")
+    fun observeAll(): Flow<List<QuickTemplateEntity>>
+
+    @Query("SELECT * FROM quick_templates ORDER BY usageCount DESC, sortOrder ASC")
+    suspend fun getAll(): List<QuickTemplateEntity>
+
+    @Query("SELECT * FROM quick_templates WHERE id = :id")
+    suspend fun findById(id: String): QuickTemplateEntity?
+
+    @Upsert
+    suspend fun upsert(template: QuickTemplateEntity)
+
+    @Upsert
+    suspend fun upsertAll(templates: List<QuickTemplateEntity>)
+
+    @Query("UPDATE quick_templates SET usageCount = usageCount + 1 WHERE id = :id")
+    suspend fun incrementUsage(id: String)
+
+    @Query("DELETE FROM quick_templates WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM quick_templates")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface AssetDao {
+    @Query("SELECT * FROM assets ORDER BY archived ASC, createdAtMillis DESC")
+    fun observeAll(): Flow<List<AssetEntity>>
+
+    @Query("SELECT * FROM assets ORDER BY archived ASC, createdAtMillis DESC")
+    suspend fun getAll(): List<AssetEntity>
+
+    @Query("SELECT * FROM assets WHERE id = :id")
+    suspend fun findById(id: String): AssetEntity?
+
+    @Upsert
+    suspend fun upsert(asset: AssetEntity)
+
+    @Upsert
+    suspend fun upsertAll(assets: List<AssetEntity>)
+
+    @Query("DELETE FROM assets WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM assets")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface AssetPriceSnapshotDao {
+    @Query("SELECT * FROM asset_price_snapshots ORDER BY recordedAtMillis ASC")
+    fun observeAll(): Flow<List<AssetPriceSnapshotEntity>>
+
+    @Query("SELECT * FROM asset_price_snapshots ORDER BY recordedAtMillis ASC")
+    suspend fun getAll(): List<AssetPriceSnapshotEntity>
+
+    @Query("SELECT * FROM asset_price_snapshots WHERE assetId = :assetId ORDER BY recordedAtMillis DESC LIMIT :limit")
+    suspend fun recentForAsset(assetId: String, limit: Int = 120): List<AssetPriceSnapshotEntity>
+
+    @Upsert
+    suspend fun upsertAll(snapshots: List<AssetPriceSnapshotEntity>)
+
+    @Query("DELETE FROM asset_price_snapshots WHERE assetId = :assetId")
+    suspend fun deleteForAsset(assetId: String)
+
+    @Query("DELETE FROM asset_price_snapshots")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface AppEventDao {
+    @Query("SELECT * FROM app_events ORDER BY occurredAtMillis DESC LIMIT :limit")
+    suspend fun recent(limit: Int = 200): List<AppEventEntity>
+
+    @Query("SELECT COUNT(*) FROM app_events")
+    suspend fun count(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(event: AppEventEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(events: List<AppEventEntity>)
+
+    @Query("DELETE FROM app_events WHERE occurredAtMillis < :beforeMillis")
+    suspend fun purgeOlderThan(beforeMillis: Long): Int
+
+    @Query("DELETE FROM app_events")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface SavingsDepositDao {
+    @Query("SELECT * FROM savings_deposits WHERE goalId = :goalId ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC")
+    fun observeForGoal(goalId: String): Flow<List<SavingsDepositEntity>>
+
+    @Query("SELECT * FROM savings_deposits WHERE goalId = :goalId ORDER BY occurredOnEpochDay DESC, createdAtMillis DESC")
+    suspend fun getForGoal(goalId: String): List<SavingsDepositEntity>
+
+    @Query(
+        "SELECT * FROM savings_deposits WHERE occurredOnEpochDay >= :start AND occurredOnEpochDay < :end " +
+            "ORDER BY occurredOnEpochDay DESC",
+    )
+    suspend fun getBetween(start: Long, end: Long): List<SavingsDepositEntity>
+
+    @Query("SELECT * FROM savings_deposits")
+    suspend fun getAll(): List<SavingsDepositEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(deposit: SavingsDepositEntity)
+
+    @Upsert
+    suspend fun upsertAll(deposits: List<SavingsDepositEntity>)
+
+    @Query("DELETE FROM savings_deposits WHERE goalId = :goalId")
+    suspend fun deleteForGoal(goalId: String)
+
+    @Query("DELETE FROM savings_deposits")
     suspend fun deleteAll()
 }
