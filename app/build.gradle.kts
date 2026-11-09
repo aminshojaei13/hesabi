@@ -41,6 +41,8 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 }
 
 dependencies {
@@ -61,6 +63,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.sqlcipher.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     "ksp"(libs.androidx.room.compiler)
@@ -72,6 +76,7 @@ dependencies {
     testImplementation(libs.androidx.junit)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

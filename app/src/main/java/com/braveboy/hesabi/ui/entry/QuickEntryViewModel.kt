@@ -1,10 +1,15 @@
 package com.braveboy.hesabi.ui.entry
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.braveboy.hesabi.core.date.JalaliDate
 import com.braveboy.hesabi.core.money.AmountExpressionEvaluator
+import com.braveboy.hesabi.core.ocr.ReceiptOcrScanner
+import com.braveboy.hesabi.core.receipt.ReceiptStorageManager
 import com.braveboy.hesabi.domain.logic.DuplicateDetector
+import com.braveboy.hesabi.domain.logic.ReceiptOcrResult
 import com.braveboy.hesabi.domain.logic.SmartCategorySuggester
 import com.braveboy.hesabi.domain.model.Account
 import com.braveboy.hesabi.domain.model.Category
@@ -25,6 +30,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * A receipt that has just been photographed or picked. The amount is a suggestion:
+ * the user edits it in the sheet and nothing is saved until they press «استفاده».
+ */
+data class ReceiptScanState(
+    val imagePath: String,
+    val scanning: Boolean = true,
+    val result: ReceiptOcrResult = ReceiptOcrResult(),
+    val suggestion: String? = null,
+    val error: String? = null,
+)
+
 data class QuickEntryUiState(
     val type: TransactionType = TransactionType.EXPENSE,
     val expression: String = "",
@@ -39,6 +56,9 @@ data class QuickEntryUiState(
     val occurredOnEpochDay: Long = JalaliDate.today().toEpochDay(),
     val suggestion: String? = null,
     val errors: List<String> = emptyList(),
+    val duplicateOf: Transaction? = null,
+    val receiptScan: ReceiptScanState? = null,
+    val receiptImagePath: String? = null,
     val saving: Boolean = false,
     val finished: Boolean = false,
     val loading: Boolean = true,
@@ -184,12 +204,21 @@ class QuickEntryViewModel(
         _state.update { current ->
             val category = template.categoryId?.let { id -> current.categories.firstOrNull { it.id == id } }
             val account = template.accountId?.let { id -> current.accounts.firstOrNull { it.id == id } }
+            val accountId = account?.id ?: current.accountId
+            val toAccountId = if (template.type == TransactionType.TRANSFER) {
+                template.toAccountId?.takeIf { it != accountId }
+                    ?: current.toAccountId?.takeIf { it != accountId }
+                    ?: current.accounts.firstOrNull { it.id != accountId }?.id
+            } else {
+                null
+            }
             current.copy(
                 type = template.type,
                 expression = template.amountToman.takeIf { it > 0 }?.toString() ?: current.expression,
                 amountToman = template.amountToman.takeIf { it > 0 } ?: current.amountToman,
                 categoryId = category?.id ?: current.categoryId,
-                accountId = account?.id ?: current.accountId,
+                accountId = accountId,
+                toAccountId = toAccountId,
                 note = template.note.ifBlank { current.note },
                 suggestion = null,
                 errors = emptyList(),
@@ -225,9 +254,84 @@ class QuickEntryViewModel(
         }
     }
 
-    fun save() {
+    fun dismissDuplicate() {
+        _state.update { it.copy(duplicateOf = null) }
+    }
+
+    /** Saves the image encrypted first, then reads it fully on-device. */
+    fun scanReceipt(context: Context, uri: Uri) {
+        if (_state.value.receiptScan?.scanning == true) return
+        viewModelScope.launch {
+            val appContext = context.applicationContext
+            val path = ReceiptStorageManager.saveReceiptFromUri(appContext, uri)
+            if (path == null) {
+                _state.update { it.copy(errors = listOf("تصویر رسید خوانده نشد؛ دوباره امتحان کن.")) }
+                return@launch
+            }
+            _state.update { it.copy(receiptScan = ReceiptScanState(imagePath = path)) }
+            val result = runCatching { ReceiptOcrScanner.scan(appContext, uri) }.getOrNull()
+            _state.update { current ->
+                val scan = current.receiptScan
+                if (scan == null) {
+                    current
+                } else {
+                    val suggestion = result?.merchant?.takeIf { it.isNotBlank() }?.let { merchant ->
+                        SmartCategorySuggester.suggest(
+                            text = merchant,
+                            history = emptyList(),
+                            categories = current.categories.filter {
+                                it.kind == CategoryKind.EXPENSE && !it.archived
+                            },
+                            kind = CategoryKind.EXPENSE,
+                        )?.let { "دستهٔ «${it.categoryName}» برای این رسید پیشنهاد می‌شود." }
+                    }
+                    current.copy(
+                        receiptScan = scan.copy(
+                            scanning = false,
+                            result = result ?: ReceiptOcrResult(),
+                            suggestion = suggestion,
+                            error = when {
+                                result == null -> "خواندن تصویر ممکن نشد. مبلغ را دستی وارد کن."
+                                result.amountToman == null -> "مبلغی روی رسید پیدا نشد. مبلغ را دستی وارد کن."
+                                else -> null
+                            },
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Confirms the OCR sheet. The user-edited amount is authoritative. */
+    fun applyReceiptScan(amountToman: Long, note: String, categoryId: String?) {
+        val current = _state.value
+        val scan = current.receiptScan ?: return
+        if (amountToman <= 0) return
+        _state.update {
+            it.copy(
+                expression = amountToman.toString(),
+                amountToman = amountToman,
+                note = note.take(200),
+                categoryId = categoryId?.takeIf { id -> it.filteredCategories.any { c -> c.id == id } }
+                    ?: it.categoryId,
+                receiptImagePath = scan.imagePath,
+                receiptScan = null,
+                suggestion = null,
+                errors = emptyList(),
+            )
+        }
+    }
+
+    fun dismissReceiptScan() {
+        val scan = _state.value.receiptScan ?: return
+        _state.update { it.copy(receiptScan = null) }
+        viewModelScope.launch { ReceiptStorageManager.deleteReceiptFile(scan.imagePath) }
+    }
+
+    fun save(force: Boolean = false) {
         val snapshot = _state.value
         if (snapshot.saving) return
+        if (snapshot.duplicateOf != null && !force) return
         val errors = buildList {
             if (snapshot.amountToman <= 0) add("مبلغ را وارد کن.")
             if (snapshot.accountId.isBlank()) add("حساب را انتخاب کن.")
@@ -244,7 +348,7 @@ class QuickEntryViewModel(
         }
         _state.update { it.copy(saving = true, errors = emptyList()) }
         viewModelScope.launch {
-            val duplicate = if (snapshot.type == TransactionType.TRANSFER) null else {
+            val duplicate = if (snapshot.type == TransactionType.TRANSFER || force) null else {
                 DuplicateDetector.findDuplicate(
                     amountToman = snapshot.amountToman,
                     type = snapshot.type,
@@ -257,7 +361,8 @@ class QuickEntryViewModel(
                 _state.update {
                     it.copy(
                         saving = false,
-                        errors = listOf("تراکنشی با همین مبلغ و حساب امروز ثبت شده است. اگر تکراری نیست، دوباره ثبت کن."),
+                        duplicateOf = duplicate,
+                        errors = emptyList(),
                     )
                 }
                 return@launch
@@ -271,6 +376,7 @@ class QuickEntryViewModel(
                 categoryId = snapshot.categoryId.takeIf { snapshot.type != TransactionType.TRANSFER },
                 occurredOnEpochDay = snapshot.occurredOnEpochDay,
                 note = snapshot.note.trim(),
+                receiptImagePath = snapshot.receiptImagePath,
                 source = TransactionSource.QUICK_REPEAT,
             )
             runCatching { transactionRepository.save(transaction) }

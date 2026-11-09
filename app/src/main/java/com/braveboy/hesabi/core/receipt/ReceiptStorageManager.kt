@@ -84,6 +84,15 @@ object ReceiptStorageManager {
         }.getOrNull()
     }
 
+    /**
+     * Full-resolution, orientation-corrected bitmap for on-device OCR. Kept separate
+     * from [loadBitmap] because text recognition needs more pixels than a preview.
+     */
+    fun loadBitmapForOcr(context: Context, uri: Uri): Bitmap? {
+        val original = decodeBounded(context, uri, MAX_DIMENSION) ?: return null
+        return runCatching { fixOrientation(context, uri, original) }.getOrDefault(original)
+    }
+
     /** Deletes files under `filesDir/receipts` that no live transaction references. */
     suspend fun deleteOrphaned(context: Context, referencedPaths: Set<String>): Int =
         withContext(Dispatchers.IO) {

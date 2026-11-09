@@ -81,6 +81,9 @@ class SettingsViewModel(
 
     fun setAiMode(mode: AiMode) = launchSetting { settingsRepository.setAiMode(mode) }
 
+    fun setAssetPricesAutoUpdate(enabled: Boolean) =
+        launchSetting { settingsRepository.setAssetPricesAutoUpdate(enabled) }
+
     fun setMonthlySalary(amountToman: Long) = launchSetting { settingsRepository.setMonthlySalary(amountToman) }
 
     fun setSalaryAccountId(id: String?) = launchSetting { settingsRepository.setSalaryAccountId(id) }

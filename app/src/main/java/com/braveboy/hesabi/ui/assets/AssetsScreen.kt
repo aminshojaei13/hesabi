@@ -116,6 +116,19 @@ fun AssetsScreen(
                     profitPercent = state.summary.profitPercent,
                 )
             }
+            if (state.autoUpdateAvailable) {
+                item {
+                    InfoBanner(
+                        text = if (state.syncing) {
+                            "در حال گرفتن قیمت طلا و ارز از TGJU…"
+                        } else {
+                            "قیمت طلا و ارز را می‌توانی از منبع عمومی TGJU بگیر؛ منبع و ساعتش روی هر دارایی ثبت می‌شود."
+                        },
+                        actionLabel = if (state.syncing) null else "به‌روزرسانی",
+                        onAction = viewModel::syncPrices,
+                    )
+                }
+            }
             if (state.summary.allocations.isNotEmpty()) {
                 item {
                     HesabiCard {

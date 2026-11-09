@@ -14,9 +14,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Backspace
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
@@ -34,9 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.braveboy.hesabi.core.money.Digits
 import com.braveboy.hesabi.di.AppContainer
@@ -52,7 +60,9 @@ import com.braveboy.hesabi.ui.components.HesabiTopBar
 import com.braveboy.hesabi.ui.components.InfoBanner
 import com.braveboy.hesabi.ui.components.TransactionTypeToggle
 import com.braveboy.hesabi.ui.hesabiViewModel
+import com.braveboy.hesabi.ui.receipt.ReceiptScanDialog
 import com.braveboy.hesabi.ui.theme.HesabiSpacing
+import java.io.File
 
 /**
  * The "حساب سریع" screen. Default path is: type amount, tap category, save — the
@@ -70,6 +80,30 @@ fun QuickEntryScreen(
     val viewModel: QuickEntryViewModel = hesabiViewModel(container, initialType = initialType)
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showTemplateDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) viewModel.scanReceipt(context, uri) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { saved ->
+        val uri = pendingCaptureUri
+        pendingCaptureUri = null
+        if (saved && uri != null) viewModel.scanReceipt(context, uri)
+    }
+
+    fun captureReceipt() {
+        runCatching {
+            val directory = File(context.cacheDir, "captures").apply { mkdirs() }
+            val file = File(directory, "receipt-${System.currentTimeMillis()}.jpg")
+            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        }.onSuccess { uri ->
+            pendingCaptureUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
 
     LaunchedEffect(state.finished) {
         if (state.finished) onDone()
@@ -96,6 +130,38 @@ fun QuickEntryScreen(
             }
             item {
                 AmountEntryDisplay(amountToman = state.amountToman, type = state.type)
+            }
+            if (state.type != TransactionType.TRANSFER) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
+                    ) {
+                        HesabiButton(
+                            text = "اسکن رسید",
+                            onClick = { captureReceipt() },
+                            variant = com.braveboy.hesabi.ui.components.HesabiButtonVariant.SECONDARY,
+                            icon = Icons.Rounded.PhotoCamera,
+                            modifier = Modifier.weight(1f),
+                        )
+                        HesabiButton(
+                            text = "از گالری",
+                            onClick = {
+                                galleryLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                            variant = com.braveboy.hesabi.ui.components.HesabiButtonVariant.SECONDARY,
+                            icon = Icons.Rounded.Image,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            if (state.receiptImagePath != null) {
+                item {
+                    InfoBanner(text = "رسید به این تراکنش پیوست می‌شود.")
+                }
             }
             if (state.expression.any { it in "+-*/÷×%٪" }) {
                 item {
@@ -249,6 +315,38 @@ fun QuickEntryScreen(
             },
         )
     }
+
+    state.receiptScan?.let { scan ->
+        ReceiptScanDialog(
+            scan = scan,
+            categories = state.filteredCategories,
+            onDismiss = viewModel::dismissReceiptScan,
+            onUse = viewModel::applyReceiptScan,
+        )
+    }
+
+    if (state.duplicateOf != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDuplicate,
+            title = { Text("تراکنش مشابه پیدا شد") },
+            text = {
+                Text(
+                    "امروز تراکنشی با همین مبلغ و حساب ثبت شده است. " +
+                        "اگر این یکی جداست، یک‌بار دیگر تأیید کن.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.save(force = true) }) {
+                    Text("ثبت دوباره")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDuplicate) {
+                    Text("انصراف")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -336,7 +434,7 @@ private fun CalculatorKey(
         ) {
             if (icon) {
                 Icon(
-                    Icons.Rounded.Backspace,
+                    Icons.AutoMirrored.Rounded.Backspace,
                     contentDescription = "پاک کردن یک رقم",
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 )

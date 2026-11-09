@@ -67,6 +67,8 @@ class HesabiViewModelFactory(
             modelClass.isAssignableFrom(AssetsViewModel::class.java) -> AssetsViewModel(
                 assetRepository = container.assetRepository,
                 diagnosticsRepository = container.diagnosticsRepository,
+                priceSyncManager = container.assetPriceSyncManager,
+                settingsRepository = container.settingsRepository,
             )
             modelClass.isAssignableFrom(TrashViewModel::class.java) -> TrashViewModel(
                 transactionRepository = container.transactionRepository,
