@@ -573,3 +573,229 @@ fun PreviewOptionC() {
         }
     }
 }
+
+@Preview(name = "طرح شیشه‌ای متحرک - Lumina Target UI", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun PreviewLuminaFuturisticUi() {
+    HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.DARK) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0B0E17))
+                    .padding(16.dp),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    // 1. Top Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0x3D10B981),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF10B981)),
+                                modifier = Modifier.size(44.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("👤", style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "سلام، ماهگین",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.6f),
+                                )
+                                Text(
+                                    text = "درختی ترینی کن !",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                )
+                            }
+                        }
+
+                        // Glass Bell with Pink Badge
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0x2B1F273B),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF)),
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                BadgedBox(
+                                    badge = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFEC4899)),
+                                        )
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Notifications,
+                                        contentDescription = "نوتیفیکیشن",
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Main Hero Balance Card
+                    com.braveboy.hesabi.ui.components.HeroBalanceCard(
+                        totalBalance = "۰۱۴۲,۲۷۵,۰۰۰",
+                        monthExpense = "۳,۲۰۰,۰۰۰",
+                        monthIncome = "۸,۵۰۰,۰۰۰",
+                    )
+
+                    // 3. Daily Safe To Spend Circular Gauge Dial
+                    com.braveboy.hesabi.ui.components.DailySafeToSpendWidget(
+                        safeToSpend = com.braveboy.hesabi.domain.logic.DailySafeToSpend(
+                            safeToSpendTodayToman = 600_000,
+                            spentTodayToman = 360_000,
+                            daysRemaining = 12,
+                            totalAvailableToman = 5_000_000,
+                            totalExpenseThisCycleToman = 2_000_000,
+                            cycleStartDate = com.braveboy.hesabi.core.date.JalaliDate.today(),
+                            nextPaydayDate = com.braveboy.hesabi.core.date.JalaliDate.today(),
+                            burnRateStatus = com.braveboy.hesabi.domain.logic.BurnRateStatus.EXCELLENT,
+                            dailyBudgetCapToman = 500_000,
+                        )
+                    )
+
+                    // 4. Quick Action Pills Row
+                    com.braveboy.hesabi.ui.components.QuickActionRow(
+                        onVoiceEntry = {},
+                        onQuickExpense = {},
+                        onTransfer = {},
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Preview(name = "Lumina UI - Light Mode", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_NO)
+@Composable
+fun PreviewLuminaUiLight() {
+    val lumina = com.braveboy.hesabi.ui.theme.LightLuminaColors
+    HesabiTheme(themeMode = com.braveboy.hesabi.domain.model.ThemeMode.LIGHT) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF8FAFC))
+                    .padding(16.dp),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    // 1. Top Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = lumina.voicePillBg,
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, lumina.voicePillIcon),
+                                modifier = Modifier.size(44.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("👤", style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "سلام، ماهگین",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = lumina.textSecondary,
+                                )
+                                Text(
+                                    text = "درختی ترینی کن !",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = lumina.textPrimary,
+                                )
+                            }
+                        }
+
+                        // Glass Bell with Pink Badge
+                        Surface(
+                            shape = CircleShape,
+                            color = lumina.pillBg,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, lumina.pillBorder),
+                            shadowElevation = lumina.cardElevation,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                BadgedBox(
+                                    badge = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFEC4899)),
+                                        )
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Notifications,
+                                        contentDescription = "نوتیفیکیشن",
+                                        tint = lumina.textPrimary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Main Hero Balance Card
+                    com.braveboy.hesabi.ui.components.HeroBalanceCard(
+                        totalBalance = "۰۱۴۲,۲۷۵,۰۰۰",
+                        monthExpense = "۳,۲۰۰,۰۰۰",
+                        monthIncome = "۸,۵۰۰,۰۰۰",
+                    )
+
+                    // 3. Daily Safe To Spend Circular Gauge Dial
+                    com.braveboy.hesabi.ui.components.DailySafeToSpendWidget(
+                        safeToSpend = com.braveboy.hesabi.domain.logic.DailySafeToSpend(
+                            safeToSpendTodayToman = 600_000,
+                            spentTodayToman = 360_000,
+                            daysRemaining = 12,
+                            totalAvailableToman = 5_000_000,
+                            totalExpenseThisCycleToman = 2_000_000,
+                            cycleStartDate = com.braveboy.hesabi.core.date.JalaliDate.today(),
+                            nextPaydayDate = com.braveboy.hesabi.core.date.JalaliDate.today(),
+                            burnRateStatus = com.braveboy.hesabi.domain.logic.BurnRateStatus.EXCELLENT,
+                            dailyBudgetCapToman = 500_000,
+                        )
+                    )
+
+                    // 4. Quick Action Pills Row
+                    com.braveboy.hesabi.ui.components.QuickActionRow(
+                        onVoiceEntry = {},
+                        onQuickExpense = {},
+                        onTransfer = {},
+                    )
+                }
+            }
+        }
+    }
+}

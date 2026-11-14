@@ -167,55 +167,12 @@ fun BalanceHero(
     monthIncomeToman: Long,
     modifier: Modifier = Modifier,
 ) {
-    val semantic = LocalHesabiSemantic.current
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.primary,
-    ) {
-        Column(
-            modifier = Modifier.padding(HesabiSpacing.xl),
-            verticalArrangement = Arrangement.spacedBy(HesabiSpacing.md)
-        ) {
-            Text(
-                text = "موجودی کل",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-            )
-            AmountText(
-                amountToman = balanceToman,
-                style = MaterialTheme.typography.displaySmall,
-                hidden = null,
-                modifier = Modifier,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.xl)) {
-                Column {
-                    Text(
-                        "هزینه این ماه",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                    )
-                    Text(
-                        text = Money.format(monthExpenseToman, withUnit = false),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                    )
-                }
-                Column {
-                    Text(
-                        "درآمد این ماه",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                    )
-                    Text(
-                        text = Money.format(monthIncomeToman, withUnit = false),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = semantic.income,
-                    )
-                }
-            }
-        }
-    }
+    HeroBalanceCard(
+        totalBalance = Money.format(balanceToman),
+        monthExpense = Money.format(monthExpenseToman),
+        monthIncome = Money.format(monthIncomeToman),
+        modifier = modifier,
+    )
 }
 
 @Preview(name = "مبالغ")

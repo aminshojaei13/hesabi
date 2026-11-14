@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -186,6 +188,8 @@ fun HomeContent(
     modifier: Modifier = Modifier,
 ) {
     val report = state.report
+    val lumina = com.braveboy.hesabi.ui.theme.LocalHesabiLumina.current
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -204,18 +208,20 @@ fun HomeContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                // User Greeting & Avatar (Left in RTL)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm),
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = lumina.voicePillBg,
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, lumina.voicePillIcon),
                         modifier = Modifier.size(44.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "👋",
+                                text = "👤",
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
@@ -224,23 +230,27 @@ fun HomeContent(
                         Text(
                             text = "سلام، خوش‌آمدید",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = lumina.textSecondary,
                         )
                         Text(
-                            text = "حسابی",
+                            text = "حسابی !",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
+                            color = lumina.textPrimary,
                         )
                     }
                 }
 
+                // Action items & Notification Bell (Right in RTL)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.xs),
                 ) {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        color = lumina.pillBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, lumina.pillBorder),
+                        shadowElevation = lumina.cardElevation,
                         modifier = Modifier.height(38.dp),
                     ) {
                         Row(
@@ -251,29 +261,37 @@ fun HomeContent(
                                 text = JalaliDate.today().let { Digits.toPersian("${it.day} ${it.monthName()}") },
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = lumina.voicePillIcon,
                             )
                         }
                     }
 
-                    if (state.pendingSmsCount > 0) {
-                        Surface(
-                            onClick = onOpenSms,
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(38.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                BadgedBox(
-                                    badge = { Badge { Text(state.pendingSmsCount.toString()) } }
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Notifications,
-                                        contentDescription = "پیامک‌ها",
-                                        modifier = Modifier.size(20.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // Glass Notification Bell with Pink Badge Dot
+                    Surface(
+                        onClick = onOpenSms,
+                        shape = CircleShape,
+                        color = lumina.pillBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, lumina.pillBorder),
+                        shadowElevation = lumina.cardElevation,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            BadgedBox(
+                                badge = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFEC4899)),
                                     )
                                 }
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Notifications,
+                                    contentDescription = "پیامک‌ها",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = lumina.textPrimary,
+                                )
                             }
                         }
                     }
@@ -281,15 +299,17 @@ fun HomeContent(
                     Surface(
                         onClick = onOpenAssistant,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(38.dp),
+                        color = lumina.pillBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, lumina.pillBorder),
+                        shadowElevation = lumina.cardElevation,
+                        modifier = Modifier.size(40.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Rounded.AutoAwesome,
                                 contentDescription = "دستیار مالی",
                                 modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                tint = Color(0xFF8B5CF6),
                             )
                         }
                     }
@@ -297,15 +317,17 @@ fun HomeContent(
                     Surface(
                         onClick = onOpenSettings,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(38.dp),
+                        color = lumina.pillBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, lumina.pillBorder),
+                        shadowElevation = lumina.cardElevation,
+                        modifier = Modifier.size(40.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Rounded.Settings,
                                 contentDescription = "تنظیمات",
                                 modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = lumina.textSecondary,
                             )
                         }
                     }
@@ -329,36 +351,11 @@ fun HomeContent(
             )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(HesabiSpacing.sm)) {
-                QuickAction(
-                    label = "ثبت صوتی",
-                    icon = Icons.Rounded.Mic,
-                    color = MaterialTheme.colorScheme.secondary,
-                    onClick = onOpenVoice,
-                    modifier = Modifier.weight(1f),
-                )
-                QuickAction(
-                    label = "هزینه",
-                    icon = Icons.AutoMirrored.Rounded.TrendingDown,
-                    color = LocalHesabiSemantic.current.expense,
-                    onClick = { onAdd(TransactionType.EXPENSE) },
-                    modifier = Modifier.weight(1f),
-                )
-                QuickAction(
-                    label = "درآمد",
-                    icon = Icons.AutoMirrored.Rounded.TrendingUp,
-                    color = LocalHesabiSemantic.current.income,
-                    onClick = { onAdd(TransactionType.INCOME) },
-                    modifier = Modifier.weight(1f),
-                )
-                QuickAction(
-                    label = "انتقال",
-                    icon = Icons.Rounded.SwapHoriz,
-                    color = LocalHesabiSemantic.current.transfer,
-                    onClick = { onAdd(TransactionType.TRANSFER) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            com.braveboy.hesabi.ui.components.QuickActionRow(
+                onVoiceEntry = onOpenVoice,
+                onQuickExpense = { onAdd(TransactionType.EXPENSE) },
+                onTransfer = { onAdd(TransactionType.TRANSFER) },
+            )
         }
         item {
             MonthlySalaryLiquidityCard(

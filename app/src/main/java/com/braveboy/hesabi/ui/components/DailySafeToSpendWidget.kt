@@ -4,7 +4,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarToday
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,7 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -37,16 +34,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.braveboy.hesabi.core.money.Digits
-import com.braveboy.hesabi.core.money.Money
-import com.braveboy.hesabi.domain.logic.BurnRateStatus
 import com.braveboy.hesabi.domain.logic.DailySafeToSpend
-import com.braveboy.hesabi.ui.theme.HesabiRadius
-import com.braveboy.hesabi.ui.theme.HesabiSpacing
 import com.braveboy.hesabi.ui.theme.LocalHesabiLumina
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
- * Modern Dribbble-inspired Daily Safe-to-Spend radial gauge widget.
- * Visually conveys whether the user is on track, in caution, or overspending today.
+ * Modern Dribbble-inspired Daily Safe-to-Spend radial gauge widget with perimeter ticks
+ * and neon glow indicator cap. Dynamically adapts to Light and Dark Lumina themes.
  */
 @Composable
 fun DailySafeToSpendWidget(
@@ -56,37 +51,10 @@ fun DailySafeToSpendWidget(
 ) {
     val lumina = LocalHesabiLumina.current
 
-    val (statusColor, statusGlow, statusIcon, statusLabel) = when (safeToSpend.burnRateStatus) {
-        BurnRateStatus.EXCELLENT -> Quad(
-            lumina.safeBudgetGreen,
-            lumina.glowPrimary,
-            Icons.Rounded.CheckCircle,
-            "وضعیت عالی",
-        )
-        BurnRateStatus.NORMAL -> Quad(
-            lumina.voiceWaveformSecondary,
-            lumina.glowSecondary,
-            Icons.Rounded.CheckCircle,
-            "متعادل",
-        )
-        BurnRateStatus.CAUTION -> Quad(
-            lumina.cautionBudgetYellow,
-            lumina.cautionBudgetYellow.copy(alpha = 0.2f),
-            Icons.Rounded.Warning,
-            "احتیاط در خرج",
-        )
-        BurnRateStatus.DANGER -> Quad(
-            lumina.dangerBudgetRed,
-            lumina.dangerBudgetRed.copy(alpha = 0.2f),
-            Icons.Rounded.Info,
-            "هشدار بودجه",
-        )
-    }
-
     val progressFraction = if (safeToSpend.safeToSpendTodayToman > 0) {
-        (safeToSpend.spentTodayToman.toFloat() / safeToSpend.safeToSpendTodayToman).coerceIn(0f, 1f)
+        (safeToSpend.spentTodayToman.toFloat() / safeToSpend.safeToSpendTodayToman).coerceIn(0.15f, 1f)
     } else {
-        1f
+        0.6f
     }
 
     val animatedProgress by animateFloatAsState(
@@ -95,151 +63,180 @@ fun DailySafeToSpendWidget(
         label = "radialProgress",
     )
 
+    val percentInt = (animatedProgress * 100).toInt()
+
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        glowColor = statusGlow,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Header Row
+            // Header Action Icons Row (3-dots on left, info on right in RTL)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = "خرج امن امروز",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                Icon(
+                    Icons.Rounded.MoreVert,
+                    contentDescription = null,
+                    tint = lumina.textSecondary,
+                    modifier = Modifier.size(20.dp),
                 )
 
-                // Status chip
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = statusColor.copy(alpha = 0.15f),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            statusIcon,
-                            contentDescription = null,
-                            tint = statusColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            text = statusLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor,
-                        )
-                    }
-                }
+                Icon(
+                    Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = lumina.textSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
             }
 
-            Spacer(Modifier.height(HesabiSpacing.lg))
+            Spacer(Modifier.height(6.dp))
 
-            // Central Glowing Radial Gauge
+            // Central Glowing Radial Gauge Dial with Perimeter Ticks
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(160.dp),
+                modifier = Modifier.size(220.dp),
             ) {
-                Canvas(modifier = Modifier.size(150.dp)) {
-                    val strokeWidth = 12.dp.toPx()
-                    val arcSize = size.width - strokeWidth
-                    val topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f)
+                Canvas(modifier = Modifier.size(210.dp)) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val strokeWidth = 14.dp.toPx()
+                    val arcRadius = (size.width - strokeWidth - 28.dp.toPx()) / 2f
+                    val startAngle = 140f
+                    val sweepAngle = 260f
 
-                    // Track background (dim arc, 240 degrees)
+                    // 1. Draw Perimeter Ticks (outer radiating lines)
+                    val tickCount = 44
+                    val tickOuterRadius = arcRadius + 18.dp.toPx()
+                    val tickInnerRadius = arcRadius + 11.dp.toPx()
+
+                    for (i in 0..tickCount) {
+                        val tickFraction = i.toFloat() / tickCount
+                        val tickAngle = startAngle + tickFraction * sweepAngle
+                        val rad = Math.toRadians(tickAngle.toDouble())
+
+                        val startX = center.x + tickInnerRadius * cos(rad).toFloat()
+                        val startY = center.y + tickInnerRadius * sin(rad).toFloat()
+                        val endX = center.x + tickOuterRadius * cos(rad).toFloat()
+                        val endY = center.y + tickOuterRadius * sin(rad).toFloat()
+
+                        val isActive = tickFraction <= animatedProgress
+                        val tickColor = if (isActive) lumina.gaugeTickActive else lumina.gaugeTickInactive
+
+                        drawLine(
+                            color = tickColor,
+                            start = Offset(startX, startY),
+                            end = Offset(endX, endY),
+                            strokeWidth = 1.6.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        )
+                    }
+
+                    val arcTopLeft = Offset(center.x - arcRadius, center.y - arcRadius)
+                    val arcDiameter = arcRadius * 2f
+
+                    // 2. Track Background Arc (dim glass)
                     drawArc(
-                        color = statusColor.copy(alpha = 0.12f),
-                        startAngle = 150f,
-                        sweepAngle = 240f,
+                        color = lumina.gaugeTrack,
+                        startAngle = startAngle,
+                        sweepAngle = sweepAngle,
                         useCenter = false,
-                        topLeft = topLeft,
-                        size = androidx.compose.ui.geometry.Size(arcSize, arcSize),
+                        topLeft = arcTopLeft,
+                        size = Size(arcDiameter, arcDiameter),
                         style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                     )
 
-                    // Active progress sweep (gradient)
+                    // 3. Active Gradient Progress Arc (Cyan -> Emerald Green -> Violet)
                     if (animatedProgress > 0f) {
                         drawArc(
-                            brush = Brush.sweepGradient(
-                                listOf(
-                                    statusColor.copy(alpha = 0.6f),
-                                    statusColor,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFF10B981), // Emerald
+                                    Color(0xFF06B6D4), // Cyan
+                                    Color(0xFF8B5CF6), // Violet
                                 ),
+                                start = Offset(0f, 0f),
+                                end = Offset(size.width, size.height),
                             ),
-                            startAngle = 150f,
-                            sweepAngle = 240f * animatedProgress,
+                            startAngle = startAngle,
+                            sweepAngle = sweepAngle * animatedProgress,
                             useCenter = false,
-                            topLeft = topLeft,
-                            size = androidx.compose.ui.geometry.Size(arcSize, arcSize),
+                            topLeft = arcTopLeft,
+                            size = Size(arcDiameter, arcDiameter),
                             style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                         )
+
+                        // 4. End Cap Glowing Knob Circle
+                        val knobAngle = startAngle + sweepAngle * animatedProgress
+                        val knobRad = Math.toRadians(knobAngle.toDouble())
+                        val knobX = center.x + arcRadius * cos(knobRad).toFloat()
+                        val knobY = center.y + arcRadius * sin(knobRad).toFloat()
+
+                        // Outer Cyan Glow Halo
+                        drawCircle(
+                            color = Color(0xFF06B6D4).copy(alpha = 0.45f),
+                            radius = 9.dp.toPx(),
+                            center = Offset(knobX, knobY),
+                        )
+                        // Inner White Dot
+                        drawCircle(
+                            color = Color.White,
+                            radius = 3.5.dp.toPx(),
+                            center = Offset(knobX, knobY),
+                        )
                     }
                 }
 
-                // Inner content
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = Money.format(safeToSpend.safeToSpendTodayToman, withUnit = false),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "تومان",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(HesabiSpacing.md))
-
-            // Footer info: Days remaining till next payday
-            Surface(
-                shape = RoundedCornerShape(HesabiRadius.chip),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = HesabiSpacing.md, vertical = HesabiSpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                // Dial Inner Center Content
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.CalendarToday,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            text = "${Digits.toPersian(safeToSpend.daysRemaining.toString())} روز تا دریافت حقوق بعدی",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
+                    Text(
+                        text = "خرج امن روزانه",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = lumina.textSecondary,
+                        fontWeight = FontWeight.Medium,
+                    )
+
+                    Spacer(Modifier.height(4.dp))
 
                     Text(
-                        text = "خرج امروز: ${Money.format(safeToSpend.spentTodayToman)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "${Digits.toPersian(percentInt.toString())}%",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = lumina.textPrimary,
                     )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(
+                        text = "${Digits.toPersian(safeToSpend.daysRemaining.toString())} باقی روز",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = lumina.textSecondary,
+                        fontWeight = FontWeight.Medium,
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Bottom Pill Badge inside Dial ("۱۳ باید")
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = lumina.gaugeCenterPillBg,
+                    ) {
+                        Text(
+                            text = "${Digits.toPersian((safeToSpend.daysRemaining + 1).toString())} باید",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = lumina.textPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
-
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

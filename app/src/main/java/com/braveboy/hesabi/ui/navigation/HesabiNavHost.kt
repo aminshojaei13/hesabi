@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -469,76 +471,91 @@ private fun HesabiFloatingNavigationBar(
     onAddClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val lumina = com.braveboy.hesabi.ui.theme.LocalHesabiLumina.current
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-            .shadow(10.dp, RoundedCornerShape(28.dp)),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        tonalElevation = 6.dp,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        ),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = lumina.navDockBg,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, lumina.navDockBorder),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Home Tab
-            HesabiNavItem(
-                label = "خانه",
-                icon = Icons.Rounded.Home,
-                selected = currentRoute == Routes.HOME,
-                onClick = { onTabSelected(Routes.HOME) },
-            )
-
-            // Transactions Tab
-            HesabiNavItem(
-                label = "تراکنش‌ها",
-                icon = Icons.AutoMirrored.Rounded.ReceiptLong,
-                selected = currentRoute == Routes.TRANSACTIONS,
-                onClick = { onTabSelected(Routes.TRANSACTIONS) },
-            )
-
-            // Center Floating Add Action
+            // Glowing Action Capsule on Left (RTL Left)
             Surface(
                 onClick = onAddClick,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 6.dp,
-                modifier = Modifier.size(46.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = lumina.voicePillBg,
+                border = BorderStroke(1.dp, lumina.voicePillBorder),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = "ثبت دستی",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = "ورود دستی",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = lumina.voicePillIcon,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
 
-            // Reports Tab
-            HesabiNavItem(
-                label = "گزارش",
-                icon = Icons.Rounded.BarChart,
-                selected = currentRoute == Routes.REPORTS,
-                onClick = { onTabSelected(Routes.REPORTS) },
-            )
+            // Center Glowing Circular Play/Action Button
+            Surface(
+                onClick = onAddClick,
+                shape = CircleShape,
+                color = Color(0xFF10B981),
+                shadowElevation = 8.dp,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669)),
+                            )
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Rounded.PlayArrow,
+                        contentDescription = "ثبت سریع",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
 
-            // More Tab
-            HesabiNavItem(
-                label = "بیشتر",
-                icon = Icons.Rounded.MoreHoriz,
-                selected = currentRoute == Routes.MORE,
-                badgeCount = pendingSmsCount,
-                onClick = { onTabSelected(Routes.MORE) },
-            )
+            // Right Items (Wallet & Home)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                HesabiNavItem(
+                    label = "تراکنش‌ها",
+                    icon = Icons.AutoMirrored.Rounded.ReceiptLong,
+                    selected = currentRoute == Routes.TRANSACTIONS,
+                    onClick = { onTabSelected(Routes.TRANSACTIONS) },
+                )
+
+                HesabiNavItem(
+                    label = "خانه",
+                    icon = Icons.Rounded.Home,
+                    selected = currentRoute == Routes.HOME,
+                    onClick = { onTabSelected(Routes.HOME) },
+                )
+            }
         }
     }
 }

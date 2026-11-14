@@ -4,6 +4,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 internal val Teal = Color(0xFF12AFC0)
 internal val TealDeep = Color(0xFF0C7F8B)
@@ -21,20 +23,20 @@ val LightScheme = lightColorScheme(
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFD7E2FF),
     onTertiaryContainer = Color(0xFF0A1B36),
-    background = Color(0xFFF6F8F9),
-    onBackground = Color(0xFF111A1C),
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF0F172A),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF111A1C),
-    surfaceVariant = Color(0xFFE7EEF0),
-    onSurfaceVariant = Color(0xFF3F494B),
-    outline = Color(0xFFD5DEE1),
-    outlineVariant = Color(0xFFE3EAEC),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0),
     error = Color(0xFFBA1A1A),
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
-    inverseSurface = Color(0xFF2A3234),
-    inverseOnSurface = Color(0xFFECF1F2),
+    inverseSurface = Color(0xFF1E293B),
+    inverseOnSurface = Color(0xFFF8FAFC),
     inversePrimary = Color(0xFF4FD8E4),
     scrim = Color(0x99000000),
 )
@@ -103,13 +105,43 @@ val DarkSemantic = HesabiSemanticColors(
 )
 
 /**
- * Extended palette for Lumina glassmorphic components. Not part of M3
- * ColorScheme but accessible via LocalHesabiLumina composition local.
+ * Extended palette for Lumina glassmorphic components.
+ * Configured separately for Dark Mode (space neon glass) and Light Mode (luxury pastel surface).
  */
 @Immutable
 data class HesabiLuminaColors(
     val glassBorder: Color = Color(0x33FFFFFF),
-    val glassBackground: Color = Color(0x1AFFFFFF),
+    val glassBackground: Color = Color(0x2B151A28),
+    val cardElevation: Dp = 0.dp,
+    val textPrimary: Color = Color(0xFFFFFFFF),
+    val textSecondary: Color = Color(0x99FFFFFF),
+    val textMuted: Color = Color(0x66FFFFFF),
+    val pillBg: Color = Color(0x2B1F273B),
+    val pillBorder: Color = Color(0x33FFFFFF),
+    val expensePillBg: Color = Color(0x2E8B5CF6),
+    val expensePillBorder: Color = Color(0x448B5CF6),
+    val expensePillText: Color = Color(0xEEFFFFFF),
+    val expensePillDot: Color = Color(0xFF8B5CF6),
+    val incomePillBg: Color = Color(0x2E10B981),
+    val incomePillBorder: Color = Color(0x4410B981),
+    val incomePillText: Color = Color(0xEEFFFFFF),
+    val incomePillDot: Color = Color(0xFF10B981),
+    val heroMeshColors: List<Color> = listOf(
+        Color(0x3D10B981),
+        Color(0x268B5CF6),
+        Color(0x1F06B6D4),
+        Color(0x33151A28),
+    ),
+    val heroMeshOverlay: Color = Color(0x260F131F),
+    val voicePillBg: Color = Color(0x3D10B981),
+    val voicePillBorder: Color = Color(0x6610B981),
+    val voicePillIcon: Color = Color(0xFF10B981),
+    val gaugeTrack: Color = Color(0x1F2B354C),
+    val gaugeTickActive: Color = Color(0xB3FFFFFF),
+    val gaugeTickInactive: Color = Color(0x26FFFFFF),
+    val gaugeCenterPillBg: Color = Color(0x3B222D42),
+    val navDockBg: Color = Color(0x3B151A28),
+    val navDockBorder: Color = Color(0x33FFFFFF),
     val glowPrimary: Color = Color(0x3310B981),
     val glowSecondary: Color = Color(0x338B5CF6),
     val voiceWaveform: Color = Color(0xFF10B981),
@@ -123,9 +155,42 @@ data class HesabiLuminaColors(
 )
 
 val DarkLuminaColors = HesabiLuminaColors()
+
 val LightLuminaColors = HesabiLuminaColors(
-    glassBorder = Color(0x1A000000),
-    glassBackground = Color(0x0D000000),
+    glassBorder = Color(0xFFE2E8F0),
+    glassBackground = Color(0xFFFFFFFF),
+    cardElevation = 2.dp,
+    textPrimary = Color(0xFF0F172A),
+    textSecondary = Color(0xFF475569),
+    textMuted = Color(0xFF94A3B8),
+    pillBg = Color(0xFFFFFFFF),
+    pillBorder = Color(0xFFE2E8F0),
+    expensePillBg = Color(0xFFF3E8FF),
+    expensePillBorder = Color(0xFFDDD6FE),
+    expensePillText = Color(0xFF5B21B6),
+    expensePillDot = Color(0xFF7C3AED),
+    incomePillBg = Color(0xFFD1FAE5),
+    incomePillBorder = Color(0xFFA7F3D0),
+    incomePillText = Color(0xFF065F46),
+    incomePillDot = Color(0xFF059669),
+    heroMeshColors = listOf(
+        Color(0xFFE6F7F5),
+        Color(0xFFF1F0FF),
+        Color(0xFFEDF5FF),
+        Color(0xFFF8FAFC),
+    ),
+    heroMeshOverlay = Color(0x40FFFFFF),
+    voicePillBg = Color(0xFFD1FAE5),
+    voicePillBorder = Color(0xFFA7F3D0),
+    voicePillIcon = Color(0xFF059669),
+    gaugeTrack = Color(0xFFE2E8F0),
+    gaugeTickActive = Color(0xFF334155),
+    gaugeTickInactive = Color(0xFFCBD5E1),
+    gaugeCenterPillBg = Color(0xFFF1F5F9),
+    navDockBg = Color(0xFFFFFFFF),
+    navDockBorder = Color(0xFFE2E8F0),
     glowPrimary = Color(0x1A10B981),
     glowSecondary = Color(0x1A8B5CF6),
+    voiceWaveform = Color(0xFF059669),
+    voiceWaveformSecondary = Color(0xFF0284C7),
 )
